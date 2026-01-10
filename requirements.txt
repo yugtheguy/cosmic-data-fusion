@@ -1,0 +1,15 @@
+# COSMIC Data Fusion - Dependencies
+# Python 3.10+ required
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# Database ORM
+sqlalchemy>=2.0.0
+
+# Data Validation
+pydantic>=2.5.0
+
+# Astronomy Library (coordinates and units ONLY)
+astropy>=6.0.0
