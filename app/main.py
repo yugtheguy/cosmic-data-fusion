@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.database import init_db
-from app.api import ingest, search, health, datasets, visualize
+from app.api import ingest, search, health, datasets, visualize, ai, query
 
 # Configure logging
 logging.basicConfig(
@@ -65,6 +65,7 @@ with automatic coordinate standardization to ICRS J2000.
 * **Automatic Transformation**: All coordinates converted to ICRS J2000 using Astropy
 * **Bounding Box Search**: Rectangular region queries on RA/Dec
 * **Cone Search**: Circular region queries with proper spherical geometry
+* **AI Discovery**: Anomaly detection and clustering for stellar analysis
 
 ### Coordinate Systems
 
@@ -91,6 +92,8 @@ app.include_router(ingest.router)
 app.include_router(search.router)
 app.include_router(datasets.router)
 app.include_router(visualize.router)
+app.include_router(ai.router)  # AI Discovery endpoints (Phase 5)
+app.include_router(query.router)  # Query & Export endpoints (Phase 3)
 app.include_router(health.router)
 
 
