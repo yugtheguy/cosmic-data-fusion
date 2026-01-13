@@ -162,3 +162,77 @@ class UnitConverter:
         # For now, return as-is
         logger.debug(f"Magnitude normalization not implemented: {source_filter} -> {target_filter}")
         return magnitude
+    
+    @staticmethod
+    def redshift_to_distance(redshift: Optional[float], h0: float = 70.0) -> Optional[float]:
+        """
+        Convert redshift to luminosity distance in parsecs.
+        
+        Uses simplified Hubble law for low redshift (z < 0.1):
+            d = c * z / H0
+        
+        For higher redshift, uses approximation:
+            d ≈ (c/H0) * z * (1 + z/2)
+        
+        Args:
+            redshift: Cosmological redshift (z)
+            h0: Hubble constant in km/s/Mpc (default: 70.0)
+            
+        Returns:
+            Distance in parsecs, or None if redshift is invalid
+            
+        Note:
+            - Speed of light c = 299,792 km/s
+            - Result is in parsecs (1 Mpc = 1,000,000 pc)
+            - Assumes flat ΛCDM cosmology approximation
+            - For precise distances, use astropy.cosmology
+        """
+        if redshift is None or redshift < 0:
+            return None
+        
+        # Speed of light in km/s
+        c = 299792.458
+        
+        # Convert H0 from km/s/Mpc to 1/s using 1 Mpc = 3.086e19 km
+        # Distance in Mpc: d_Mpc = (c/H0) * z * correction
+        
+        if redshift < 0.1:
+            # Simple Hubble law for low redshift
+            distance_mpc = (c / h0) * redshift
+        else:
+            # First-order correction for higher redshift
+            distance_mpc = (c / h0) * redshift * (1 + redshift / 2.0)
+        
+        # Convert Mpc to parsecs
+        distance_pc = distance_mpc * 1_000_000.0
+        
+        return distance_pc
+    
+    @staticmethod
+    def distance_to_redshift(distance_pc: Optional[float], h0: float = 70.0) -> Optional[float]:
+        """
+        Convert luminosity distance to redshift (inverse of redshift_to_distance).
+        
+        Uses simplified approximation.
+        
+        Args:
+            distance_pc: Distance in parsecs
+            h0: Hubble constant in km/s/Mpc (default: 70.0)
+            
+        Returns:
+            Redshift (z), or None if distance is invalid
+        """
+        if distance_pc is None or distance_pc <= 0:
+            return None
+        
+        # Convert parsecs to Mpc
+        distance_mpc = distance_pc / 1_000_000.0
+        
+        # Speed of light in km/s
+        c = 299792.458
+        
+        # Inverse calculation (simplified)
+        # For low z: z = H0 * d / c
+        redshift = (h0 * distance_mpc) / c
+        
+        return redshift

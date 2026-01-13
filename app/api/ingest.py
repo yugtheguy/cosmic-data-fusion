@@ -266,3 +266,120 @@ async def ingest_gaia(
             status_code=500,
             detail=f"Unexpected error: {str(e)}"
         )
+
+
+@router.post(
+    "/sdss",
+    summary="Ingest SDSS DR17 data",
+    description="Ingest SDSS (Sloan Digital Sky Survey) DR17 catalog data. Accepts CSV or FITS files."
+)
+async def ingest_sdss(
+    file: UploadFile = File(...),
+    dataset_id: str = None,
+    skip_invalid: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest SDSS DR17 catalog data.
+    
+    This endpoint uses the SDSS adapter to parse, validate,
+    and transform SDSS data to the unified schema.
+    
+    Args:
+        file: Uploaded SDSS data file (CSV or FITS)
+        dataset_id: Optional dataset identifier
+        skip_invalid: Whether to skip invalid records
+        db: Database session (injected)
+        
+    Returns:
+        Ingestion summary with counts and validation results
+        
+    Raises:
+        HTTPException 400: Invalid file format or data
+        HTTPException 500: Database or processing error
+    """
+    from app.services.adapters.sdss_adapter import SDSSAdapter
+    from app.models import UnifiedStarCatalog
+    from io import BytesIO
+    
+    logger.info(f"Received SDSS ingestion request: file={file.filename}")
+    
+    try:
+        # Read uploaded file content
+        content = await file.read()
+        file_obj = BytesIO(content)
+        
+        # Initialize SDSS adapter
+        adapter = SDSSAdapter(dataset_id=dataset_id)
+        
+        # Process the data
+        valid_records, validation_results = adapter.process_batch(
+            file_obj,
+            skip_invalid=skip_invalid
+        )
+        
+        if not valid_records:
+            return {
+                "success": False,
+                "message": "No valid records found in uploaded file",
+                "ingested_count": 0,
+                "failed_count": len(validation_results),
+                "dataset_id": adapter.dataset_id
+            }
+        
+        # Insert records into database
+        db_records = []
+        for record in valid_records:
+            db_record = UnifiedStarCatalog(**record)
+            db_records.append(db_record)
+        
+        # Bulk insert
+        db.bulk_save_objects(db_records)
+        db.commit()
+        
+        logger.info(f"Successfully ingested {len(db_records)} SDSS records")
+        
+        # Collect validation warnings
+        warnings = []
+        for result in validation_results:
+            if result.warnings:
+                warnings.extend(result.warnings[:2])  # Limit to avoid huge response
+        
+        warning_summary = ""
+        if warnings:
+            warning_summary = f" Warnings: {warnings[0]}"
+            if len(warnings) > 1:
+                warning_summary += f" (+{len(warnings)-1} more)"
+        
+        return {
+            "success": True,
+            "message": f"Successfully ingested {len(db_records)} SDSS records from {file.filename}.{warning_summary}",
+            "ingested_count": len(db_records),
+            "failed_count": len(validation_results) - len(valid_records),
+            "dataset_id": adapter.dataset_id,
+            "file_name": file.filename
+        }
+        
+    except ValueError as e:
+        logger.error(f"Data validation/parsing error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid data: {str(e)}"
+        )
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during SDSS ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Unexpected error during SDSS ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
+
