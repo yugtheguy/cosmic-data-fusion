@@ -1,0 +1,78 @@
+version: '3.9'
+
+services:
+  # SQLite (Development)
+  # Note: Remove this for PostgreSQL in production
+  
+  # PostgreSQL Database (Optional - for production)
+  # postgres:
+  #   image: postgis/postgis:15-3.3
+  #   environment:
+  #     POSTGRES_DB: cosmic_data
+  #     POSTGRES_USER: cosmic_user
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U cosmic_user"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # Redis Cache (Optional)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # FastAPI Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cosmic-data-fusion-app
+    environment:
+      # SQLite (default)
+      DATABASE_URL: sqlite:///./cosmic_data.db
+      
+      # PostgreSQL (uncomment for production)
+      # DATABASE_URL: postgresql://cosmic_user:${POSTGRES_PASSWORD:-secure_password}@postgres:5432/cosmic_data
+      
+      # Redis (uncomment if using)
+      # REDIS_URL: redis://redis:6379/0
+      
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-False}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./cosmic_data.db:/app/cosmic_data.db
+    # Uncomment dependencies if using PostgreSQL/Redis
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    #   redis:
+    #     condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Development utilities (optional)
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@example.com
+  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+  #   ports:
+  #     - "5050:80"
+  #   depends_on:
+  #     - postgres
+
+volumes:
+  postgres_data:
