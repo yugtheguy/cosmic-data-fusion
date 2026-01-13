@@ -23,6 +23,11 @@ def test_complete_integration():
     
     # Create test database
     print("\n[1] Setting up test database...")
+    # Ensure clean slate by removing any existing test DB file
+    test_db_path = Path(TEST_DB)
+    if test_db_path.exists():
+        test_db_path.unlink()
+        print(f"Removed existing test DB: {TEST_DB}")
     engine = create_engine(f"sqlite:///{TEST_DB}")
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
