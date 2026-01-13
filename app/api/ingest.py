@@ -537,3 +537,163 @@ def ingest_fits_file(
             detail=f"Unexpected error: {str(e)}"
         )
 
+
+@router.post(
+    "/csv",
+    summary="Ingest CSV catalog file",
+    description="""
+Ingest astronomical data from generic CSV files with flexible column mapping.
+
+Supports:
+- Auto-detection of common astronomical column names (RA, Dec, magnitude, parallax)
+- Custom column mapping for non-standard formats
+- Multiple delimiters (comma, tab, semicolon, pipe)
+- Header auto-detection
+- Data validation and type conversion
+
+**Auto-Detection Mode**: If columns use standard names (ra, dec, magnitude, parallax, etc.),
+the adapter will automatically detect them.
+
+**Custom Mapping Mode**: For non-standard column names, provide a column_mapping JSON:
+```json
+{
+  "ra": "RIGHT_ASCENSION",
+  "dec": "DECLINATION",
+  "magnitude": "MAG_V",
+  "parallax": "PLX"
+}
+```
+    """
+)
+def ingest_csv_file(
+    file: UploadFile = File(..., description="CSV file to upload"),
+    dataset_id: str = None,
+    column_mapping: str = None,
+    skip_invalid: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest generic CSV catalog file.
+    
+    Args:
+        file: CSV file upload
+        dataset_id: Optional dataset identifier for tracking
+        column_mapping: Optional JSON string mapping standard names to custom column names
+        skip_invalid: Skip invalid records (default: True)
+        db: Database session (injected)
+        
+    Returns:
+        Ingestion statistics with success/failure counts
+        
+    Raises:
+        HTTPException 400: Invalid CSV format or data
+        HTTPException 500: Database error
+    """
+    try:
+        logger.info(f"Received CSV file: {file.filename}")
+        
+        # Import here to avoid circular dependencies
+        from app.services.adapters.csv_adapter import CSVAdapter
+        from app.models import UnifiedStarCatalog
+        import json
+        from io import StringIO
+        
+        # Parse column mapping if provided
+        mapping_dict = None
+        if column_mapping:
+            try:
+                mapping_dict = json.loads(column_mapping)
+                logger.info(f"Using custom column mapping: {mapping_dict}")
+            except json.JSONDecodeError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid column_mapping JSON: {str(e)}"
+                )
+        
+        # Read file content
+        content = file.file.read().decode('utf-8')
+        csv_io = StringIO(content)
+        
+        # Initialize adapter
+        adapter = CSVAdapter(
+            dataset_id=dataset_id,
+            column_mapping=mapping_dict
+        )
+        
+        # Process file
+        valid_records, validation_results = adapter.process_batch(
+            input_data=csv_io,
+            skip_invalid=skip_invalid
+        )
+        
+        logger.info(
+            f"CSV processing complete: {len(valid_records)} valid, "
+            f"{len(validation_results) - len(valid_records)} failed"
+        )
+        
+        if not valid_records:
+            return {
+                "success": False,
+                "message": "No valid records found in CSV file",
+                "ingested_count": 0,
+                "failed_count": len(validation_results),
+                "dataset_id": adapter.dataset_id,
+                "file_name": file.filename
+            }
+        
+        # Insert records into database
+        db_records = []
+        for record in valid_records:
+            db_record = UnifiedStarCatalog(**record)
+            db_records.append(db_record)
+        
+        # Bulk insert
+        db.bulk_save_objects(db_records)
+        db.commit()
+        
+        logger.info(f"Successfully ingested {len(db_records)} CSV records")
+        
+        # Collect validation warnings (limit to avoid huge response)
+        warnings = []
+        for result in validation_results:
+            if result.warnings:
+                warnings.extend(result.warnings[:2])
+        
+        warning_summary = ""
+        if warnings:
+            warning_summary = f" Warnings: {warnings[0]}"
+            if len(warnings) > 1:
+                warning_summary += f" (+{len(warnings)-1} more)"
+        
+        return {
+            "success": True,
+            "message": f"Successfully ingested {len(db_records)} records from CSV file {file.filename}.{warning_summary}",
+            "ingested_count": len(db_records),
+            "failed_count": len(validation_results) - len(valid_records),
+            "dataset_id": adapter.dataset_id,
+            "file_name": file.filename
+        }
+        
+    except ValueError as e:
+        logger.error(f"CSV validation/parsing error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid CSV data: {str(e)}"
+        )
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during CSV ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Unexpected error during CSV ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
+
