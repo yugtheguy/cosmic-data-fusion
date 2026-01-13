@@ -11,7 +11,7 @@ All business logic is delegated to the service layer.
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -150,3 +150,46 @@ def ingest_bulk(
             status_code=500,
             detail=f"Database error: {str(e)}"
         )
+
+
+@router.post(
+    "/gaia",
+    summary="Ingest Gaia DR3 data",
+    description="Ingest Gaia DR3 catalog data. Accepts CSV or FITS files."
+)
+async def ingest_gaia(
+    file: UploadFile = File(...),
+    dataset_id: str = None,
+    skip_invalid: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest Gaia DR3 catalog data.
+    
+    This endpoint will use the Gaia adapter to parse, validate,
+    and transform Gaia data to the unified schema.
+    
+    Args:
+        file: Uploaded Gaia data file (CSV or FITS)
+        dataset_id: Optional dataset identifier
+        skip_invalid: Whether to skip invalid records
+        db: Database session (injected)
+        
+    Returns:
+        Ingestion summary with counts and validation results
+        
+    Raises:
+        HTTPException 400: Invalid file format or data
+        HTTPException 500: Database or processing error
+    """
+    # TODO: Implement Gaia adapter logic
+    # This is a skeleton endpoint to be implemented in the gaia-adapter branch
+    
+    logger.info(f"Received Gaia ingestion request: file={file.filename}")
+    
+    return {
+        "success": False,
+        "message": "Gaia adapter not yet implemented. This endpoint is a placeholder.",
+        "file_received": file.filename,
+        "note": "Implementation will be done in the gaia-adapter branch"
+    }
