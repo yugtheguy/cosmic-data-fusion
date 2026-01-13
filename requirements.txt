@@ -14,7 +14,14 @@ pydantic>=2.5.0
 # Astronomy Library (coordinates and units ONLY)
 astropy>=6.0.0
 
+# Astronomical Data Archives (for real data fetching)
+astroquery>=0.4.7
+
 # Data Science & AI Discovery (Phase 5)
 pandas>=2.0.0
 numpy>=1.24.0
 scikit-learn>=1.3.0
+scipy>=1.11.0
+
+# Progress bars (optional, for data fetching scripts)
+tqdm>=4.66.0

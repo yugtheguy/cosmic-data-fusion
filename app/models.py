@@ -24,6 +24,19 @@ class UnifiedStarCatalog(Base):
         - Essentially equivalent to FK5 J2000 for most purposes
         - Float64 provides sub-microarcsecond precision
     
+    Cross-Matching & Fusion:
+        The `fusion_group_id` column links different observations of the same
+        physical star across multiple catalogs. For example, if Gaia DR3 Object A
+        and SDSS DR17 Object B are determined to be the same physical star
+        (via positional cross-matching within a tolerance radius), they will
+        share the same UUID in `fusion_group_id`.
+        
+        This enables:
+        - Multi-wavelength analysis (combining photometry from different surveys)
+        - Cross-validation of measurements across catalogs
+        - Tracking observation history of individual stars
+        - Resolving duplicate entries from overlapping surveys
+    
     Attributes:
         id: Auto-incrementing primary key
         object_id: Unique identifier for the object
@@ -38,6 +51,7 @@ class UnifiedStarCatalog(Base):
         observation_time: ISO datetime of observation
         dataset_id: Foreign key to dataset registry
         raw_metadata: JSON field for dataset-specific fields
+        fusion_group_id: UUID linking observations of the same physical star
         created_at: UTC timestamp when record was created
     """
     
@@ -71,6 +85,11 @@ class UnifiedStarCatalog(Base):
     
     # Raw metadata storage (JSON)
     raw_metadata = Column(JSON, nullable=True)
+    
+    # Cross-match fusion group
+    # UUID linking different observations of the same physical star across catalogs
+    # e.g., Gaia DR3 source and SDSS DR17 source that are the same star share this ID
+    fusion_group_id = Column(String(36), nullable=True, index=True)
     
     # Audit timestamp
     created_at = Column(

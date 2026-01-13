@@ -8,9 +8,10 @@ Available routers:
 - visualize: Visualization data endpoints
 - ai: AI Discovery endpoints (anomaly detection, clustering)
 - query: Query & Export endpoints (advanced search, CSV/JSON/VOTable export)
+- harmonize: Harmonization endpoints (cross-match, validation)
 - health: Health check endpoint
 """
 
-from app.api import ingest, search, datasets, visualize, ai, query, health
+from app.api import ingest, search, datasets, visualize, ai, query, harmonize, health
 
-__all__ = ["ingest", "search", "datasets", "visualize", "ai", "query", "health"]
+__all__ = ["ingest", "search", "datasets", "visualize", "ai", "query", "harmonize", "health"]
