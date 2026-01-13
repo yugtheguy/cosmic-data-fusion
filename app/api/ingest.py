@@ -755,6 +755,9 @@ async def ingest_auto(
             temp_file.write(content)
             temp_path = temp_file.name
         
+        # Get file size
+        file_size = len(content)
+        
         logger.info(f"Processing auto-ingestion for file: {file.filename}")
         
         # Auto-detect adapter
@@ -773,6 +776,38 @@ async def ingest_auto(
                 status_code=400,
                 detail=f"Could not detect file type: {e.message}"
             )
+        
+        # Register dataset first
+        from app.repository.dataset_repository import DatasetRepository
+        from app.schemas import DatasetRegisterRequest
+        
+        dataset_repo = DatasetRepository(db)
+        
+        # Determine catalog type from adapter name
+        catalog_type_map = {
+            "GaiaAdapter": "gaia",
+            "SDSSAdapter": "sdss",
+            "FITSAdapter": "fits",
+            "CSVAdapter": "csv",
+            "csv": "csv",  # Handle lowercase adapter name
+            "fits": "fits",
+            "gaia": "gaia",
+            "sdss": "sdss"
+        }
+        catalog_type = catalog_type_map.get(adapter_name, "unknown")
+        
+        # Register the dataset
+        dataset_data = DatasetRegisterRequest(
+            source_name=file.filename or "Unknown",
+            catalog_type=catalog_type,
+            adapter_used=adapter_name,
+            original_filename=file.filename,
+            file_size_bytes=file_size
+        )
+        db_dataset = dataset_repo.create(dataset_data.model_dump())
+        dataset_id = db_dataset.dataset_id
+        
+        logger.info(f"Registered dataset with ID: {dataset_id}")
         
         # Get adapter class and instantiate
         adapter_class = registry.get_adapter(adapter_name)
@@ -806,13 +841,17 @@ async def ingest_auto(
                     original_source=record.get('original_source', adapter_name),
                     frame=CoordinateFrame.ICRS  # Adapters already return ICRS
                 )
-                ingestion_service.ingest_single(star_request)
+                # Ingest with dataset_id
+                ingestion_service.ingest_single(star_request, dataset_id=dataset_id)
                 records_ingested += 1
+            
+            # Update dataset record count
+            dataset_repo.update_record_count(dataset_id, records_ingested)
             
             db.commit()
             logger.info(
                 f"Successfully ingested {records_ingested} records "
-                f"using {adapter_name} adapter"
+                f"using {adapter_name} adapter for dataset {dataset_id}"
             )
             
             return AutoIngestResponse(

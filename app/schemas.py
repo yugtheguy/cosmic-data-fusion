@@ -11,6 +11,14 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
+# Import dataset schemas
+from app.dataset_schemas import (
+    DatasetRegisterRequest,
+    DatasetMetadataResponse,
+    DatasetListResponse,
+    DatasetRegistryStats
+)
+
 
 class CoordinateFrame(str, Enum):
     """

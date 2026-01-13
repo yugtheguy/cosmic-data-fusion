@@ -6,6 +6,7 @@ frame at J2000 epoch - the modern standard for astronomical catalogs.
 """
 
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Index, JSON
 
@@ -111,4 +112,91 @@ class UnifiedStarCatalog(Base):
             f"ra={self.ra_deg:.6f}°, dec={self.dec_deg:.6f}°, "
             f"mag={self.brightness_mag:.2f}, "
             f"distance={self.distance_pc:.2f}pc)>"
+        )
+
+
+class DatasetMetadata(Base):
+    """
+    Registry of ingested astronomical datasets with their metadata.
+    
+    This model tracks all datasets loaded into the system, storing information
+    about their source, schema, record counts, and configuration. Each dataset
+    represents a logical grouping of astronomical observations (e.g., a specific
+    FITS file, a CSV upload, or a bulk Gaia query).
+    
+    Key Features:
+        - Unique dataset_id (UUID) for referencing in UnifiedStarCatalog
+        - Source tracking (catalog name, version, ingestion method)
+        - Schema information (column mappings, detected fields)
+        - Record counting for data integrity validation
+        - Configuration storage (adapter settings, filters applied)
+        - License and attribution tracking
+    
+    Use Cases:
+        - Frontend dataset browser (list all ingested datasets)
+        - Data provenance (which records came from which file/query)
+        - Re-ingestion detection (avoid duplicate imports)
+        - Export attribution (maintain proper data citations)
+        - Schema mapping UI (show detected vs mapped fields)
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        dataset_id: Unique UUID identifier for this dataset
+        source_name: Human-readable source name (e.g., "Gaia DR3 Query", "NGC2244_SDSS.fits")
+        catalog_type: Type of catalog (gaia, sdss, fits, csv, etc.)
+        ingestion_time: UTC timestamp when dataset was first ingested
+        adapter_used: Which adapter processed this data (e.g., "GaiaAdapter")
+        schema_version: Version of the adapter schema used
+        record_count: Number of records ingested from this dataset
+        original_filename: Original filename if uploaded (null for API queries)
+        file_size_bytes: Size of original file in bytes (null for API queries)
+        column_mappings: JSON storing detected→unified field mappings
+        raw_config: JSON storing adapter configuration and parameters
+        license_info: License/attribution string (e.g., "ESA/Gaia DPAC", "SDSS DR17")
+        notes: Optional user notes about this dataset
+        created_at: UTC timestamp when record was created
+        updated_at: UTC timestamp when record was last modified
+    """
+    
+    __tablename__ = "dataset_metadata"
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # Unique dataset identifier (UUID)
+    dataset_id = Column(String(36), unique=True, index=True, nullable=False, default=lambda: str(uuid4()))
+    
+    # Source identification
+    source_name = Column(String(500), nullable=False)
+    catalog_type = Column(String(50), nullable=False, index=True)  # gaia, sdss, fits, csv
+    
+    # Ingestion metadata
+    ingestion_time = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    adapter_used = Column(String(100), nullable=False)
+    schema_version = Column(String(20), nullable=True)
+    
+    # Data statistics
+    record_count = Column(Integer, nullable=False, default=0)
+    
+    # File information (if applicable)
+    original_filename = Column(String(500), nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    
+    # Schema and configuration
+    column_mappings = Column(JSON, nullable=True)  # {"original_ra": "ra_deg", "original_dec": "dec_deg", ...}
+    raw_config = Column(JSON, nullable=True)       # Adapter-specific configuration
+    
+    # Attribution
+    license_info = Column(String(500), nullable=True)
+    notes = Column(String(2000), nullable=True)
+    
+    # Audit timestamps
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    def __repr__(self) -> str:
+        return (
+            f"<DatasetMetadata(id={self.id}, dataset_id='{self.dataset_id}', "
+            f"source_name='{self.source_name}', catalog_type='{self.catalog_type}', "
+            f"records={self.record_count})>"
         )
