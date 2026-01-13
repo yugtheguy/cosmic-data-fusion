@@ -68,7 +68,7 @@ class BaseAdapter(ABC):
     
     def _generate_dataset_id(self) -> str:
         """Generate a unique dataset ID."""
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
         return f"{self.source_name.lower().replace(' ', '_')}_{timestamp}"
     
     @abstractmethod

@@ -236,3 +236,59 @@ class UnitConverter:
         redshift = (h0 * distance_mpc) / c
         
         return redshift
+    
+    @staticmethod
+    def arcsec_to_mas(arcsec: float) -> float:
+        """
+        Convert arcseconds to milliarcseconds.
+        
+        Args:
+            arcsec: Angle in arcseconds
+            
+        Returns:
+            Angle in milliarcseconds
+        """
+        return arcsec * 1000.0
+    
+    @staticmethod
+    def mas_to_arcsec(mas: float) -> float:
+        """
+        Convert milliarcseconds to arcseconds.
+        
+        Args:
+            mas: Angle in milliarcseconds
+            
+        Returns:
+            Angle in arcseconds
+        """
+        return mas / 1000.0
+    
+    @staticmethod
+    def safe_float_convert(value, default: Optional[float] = None) -> Optional[float]:
+        """
+        Safely convert a value to float, handling NaN, Inf, and None.
+        
+        Useful for FITS data which may contain masked values or invalid numbers.
+        
+        Args:
+            value: Value to convert (any type)
+            default: Default value if conversion fails or value is invalid
+            
+        Returns:
+            Float value or default if invalid
+        """
+        import numpy as np
+        
+        if value is None:
+            return default
+        
+        try:
+            f = float(value)
+            if np.isfinite(f):
+                return f
+            else:
+                logger.debug(f"Non-finite value encountered: {f}")
+                return default
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Failed to convert to float: {value} ({e})")
+            return default

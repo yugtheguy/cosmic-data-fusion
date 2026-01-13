@@ -383,3 +383,157 @@ async def ingest_sdss(
             detail=f"Unexpected error: {str(e)}"
         )
 
+
+@router.post(
+    "/fits",
+    summary="Ingest FITS catalog file",
+    description="""
+Ingest astronomical data from FITS (Flexible Image Transport System) binary tables.
+
+Supports various catalogs including:
+- Hipparcos (ESA) - High precision parallax catalog
+- 2MASS (NASA/IPAC) - Near-infrared sky survey
+- Tycho-2 - Astrometric catalog
+- Sloan FITS exports
+- Pan-STARRS FITS tables
+- Gaia FITS exports
+- Custom catalogs with standard columns
+
+**Auto-Detection**: The adapter automatically detects RA, Dec, magnitude, and parallax columns
+from common naming conventions.
+
+**Multi-Extension Support**: For FITS files with multiple HDUs, specify which extension to read.
+    """
+)
+def ingest_fits_file(
+    file: UploadFile = File(..., description="FITS file to upload"),
+    dataset_id: str = None,
+    extension: int = None,
+    skip_invalid: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest FITS catalog file.
+    
+    Args:
+        file: FITS file upload
+        dataset_id: Optional dataset identifier for tracking
+        extension: Optional HDU extension index (default: first data table)
+        skip_invalid: Skip invalid records (default: True)
+        db: Database session (injected)
+        
+    Returns:
+        Ingestion statistics with success/failure counts
+        
+    Raises:
+        HTTPException 400: Invalid FITS format or data
+        HTTPException 500: Database error
+    """
+    try:
+        logger.info(f"Received FITS file: {file.filename}")
+        
+        # Import here to avoid circular dependencies
+        from app.services.adapters.fits_adapter import FITSAdapter
+        from app.models import UnifiedStarCatalog
+        import tempfile
+        import os
+        
+        # Save uploaded file to temporary location
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.fits') as tmp_file:
+            content = file.file.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        try:
+            # Initialize adapter
+            adapter = FITSAdapter(dataset_id=dataset_id)
+            
+            # Process file with optional extension parameter
+            kwargs = {'skip_invalid': skip_invalid}
+            if extension is not None:
+                kwargs['extension'] = extension
+            
+            valid_records, validation_results = adapter.process_batch(
+                input_data=tmp_file_path,
+                **kwargs
+            )
+            
+            logger.info(
+                f"FITS processing complete: {len(valid_records)} valid, "
+                f"{len(validation_results) - len(valid_records)} failed"
+            )
+            
+            if not valid_records:
+                # Clean up temp file
+                os.unlink(tmp_file_path)
+                return {
+                    "success": False,
+                    "message": "No valid records found in FITS file",
+                    "ingested_count": 0,
+                    "failed_count": len(validation_results),
+                    "dataset_id": adapter.dataset_id,
+                    "file_name": file.filename
+                }
+            
+            # Insert records into database
+            db_records = []
+            for record in valid_records:
+                db_record = UnifiedStarCatalog(**record)
+                db_records.append(db_record)
+            
+            # Bulk insert
+            db.bulk_save_objects(db_records)
+            db.commit()
+            
+            logger.info(f"Successfully ingested {len(db_records)} FITS records")
+            
+            # Collect validation warnings (limit to avoid huge response)
+            warnings = []
+            for result in validation_results:
+                if result.warnings:
+                    warnings.extend(result.warnings[:2])
+            
+            warning_summary = ""
+            if warnings:
+                warning_summary = f" Warnings: {warnings[0]}"
+                if len(warnings) > 1:
+                    warning_summary += f" (+{len(warnings)-1} more)"
+            
+            return {
+                "success": True,
+                "message": f"Successfully ingested {len(db_records)} records from FITS file {file.filename}.{warning_summary}",
+                "ingested_count": len(db_records),
+                "failed_count": len(validation_results) - len(valid_records),
+                "dataset_id": adapter.dataset_id,
+                "file_name": file.filename,
+                "catalog_info": getattr(adapter, 'header_metadata', {})
+            }
+            
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
+        
+    except ValueError as e:
+        logger.error(f"FITS validation/parsing error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid FITS data: {str(e)}"
+        )
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during FITS ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Unexpected error during FITS ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
+
