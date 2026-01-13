@@ -13,3 +13,8 @@ pydantic>=2.5.0
 
 # Astronomy Library (coordinates and units ONLY)
 astropy>=6.0.0
+
+# Data Science & AI Discovery (Phase 5)
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
