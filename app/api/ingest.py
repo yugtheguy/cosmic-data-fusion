@@ -22,8 +22,11 @@ from app.schemas import (
     StarResponse,
     IngestResponse,
     BulkIngestResponse,
+    AutoIngestResponse,
+    CoordinateFrame,
 )
 from app.services.ingestion import IngestionService
+from app.services.adapter_registry import registry, AdapterDetectionError
 
 logger = logging.getLogger(__name__)
 
@@ -697,3 +700,152 @@ def ingest_csv_file(
             detail=f"Unexpected error: {str(e)}"
         )
 
+
+@router.post(
+    "/auto",
+    response_model=AutoIngestResponse,
+    summary="Auto-detect and ingest file",
+    description=(
+        "Automatically detect the file type and use the appropriate adapter for ingestion. "
+        "Supports FITS, CSV, Gaia DR3, and SDSS DR17 formats. "
+        "Detection uses magic bytes, file extensions, and content analysis."
+    )
+)
+async def ingest_auto(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+) -> AutoIngestResponse:
+    """
+    Auto-detect file type and ingest using the appropriate adapter.
+    
+    The system will:
+    1. Analyze the uploaded file using multiple detection strategies
+    2. Select the best matching adapter based on confidence score
+    3. Parse and ingest the data using the detected adapter
+    4. Return ingestion results with detection information
+    
+    Detection Methods (in priority order):
+    - Magic bytes (binary file headers) - highest confidence (0.99)
+    - File extension matching - high confidence (0.90-0.95)
+    - Content analysis (column names) - medium confidence (0.75-0.80)
+    
+    Args:
+        file: Uploaded file (any supported format)
+        db: Database session
+        
+    Returns:
+        AutoIngestResponse with adapter information and ingestion results
+        
+    Raises:
+        HTTPException 400: If file type cannot be detected or parsing fails
+        HTTPException 500: If database error occurs
+    """
+    import tempfile
+    import os
+    
+    temp_path = None
+    
+    try:
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=os.path.splitext(file.filename or '')[1]
+        ) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        logger.info(f"Processing auto-ingestion for file: {file.filename}")
+        
+        # Auto-detect adapter
+        try:
+            adapter_name, confidence, method = registry.detect_adapter(
+                temp_path,
+                confidence_threshold=0.60
+            )
+            logger.info(
+                f"Detected adapter: {adapter_name} "
+                f"(confidence: {confidence:.2f}, method: {method})"
+            )
+        except AdapterDetectionError as e:
+            logger.warning(f"Adapter detection failed: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not detect file type: {e.message}"
+            )
+        
+        # Get adapter class and instantiate
+        adapter_class = registry.get_adapter(adapter_name)
+        adapter = adapter_class()
+        
+        # Process file using adapter (parse, validate, map)
+        try:
+            unified_records, validation_results = adapter.process_batch(
+                temp_path,
+                skip_invalid=False
+            )
+        except Exception as e:
+            logger.error(f"Processing failed with {adapter_name} adapter: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to process file with {adapter_name} adapter: {str(e)}"
+            )
+        
+        # Ingest into database
+        try:
+            ingestion_service = IngestionService(db)
+            records_ingested = 0
+            
+            # Convert unified records (dicts) to StarIngestRequest objects
+            for record in unified_records:
+                star_request = StarIngestRequest(
+                    source_id=record.get('source_id', ''),
+                    coord1=record.get('ra_deg', 0.0),
+                    coord2=record.get('dec_deg', 0.0),
+                    brightness_mag=record.get('brightness_mag'),
+                    original_source=record.get('original_source', adapter_name),
+                    frame=CoordinateFrame.ICRS  # Adapters already return ICRS
+                )
+                ingestion_service.ingest_single(star_request)
+                records_ingested += 1
+            
+            db.commit()
+            logger.info(
+                f"Successfully ingested {records_ingested} records "
+                f"using {adapter_name} adapter"
+            )
+            
+            return AutoIngestResponse(
+                message=f"Successfully ingested {records_ingested} records",
+                adapter_used=adapter_name,
+                adapter_confidence=confidence,
+                detection_method=method,
+                records_ingested=records_ingested
+            )
+            
+        except Exception as e:
+            logger.error(f"Ingestion failed: {e}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database ingestion failed: {str(e)}"
+            )
+    
+    except HTTPException:
+        raise
+    
+    except Exception as e:
+        logger.error(f"Unexpected error during auto-ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
+    
+    finally:
+        # Clean up temporary file
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {temp_path}: {e}")

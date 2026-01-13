@@ -104,6 +104,18 @@ class BulkIngestRequest(BaseModel):
     )
 
 
+class AutoIngestResponse(BaseModel):
+    """Response schema for automatic file ingestion with adapter detection."""
+    
+    message: str = Field(..., description="Status message")
+    adapter_used: str = Field(..., description="Name of the adapter that was auto-detected")
+    adapter_confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence score")
+    detection_method: str = Field(..., description="Method used for detection (magic_bytes, extension, content_analysis)")
+    records_ingested: int = Field(..., ge=0, description="Number of records successfully ingested")
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ============================================================
 # SEARCH SCHEMAS
 # ============================================================
