@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class CoordinateFrame(str, Enum):
@@ -165,6 +165,8 @@ class ConeSearchParams(BaseModel):
 class StarResponse(BaseModel):
     """Response schema for star data."""
     
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     source_id: str
     ra_deg: float
@@ -173,9 +175,6 @@ class StarResponse(BaseModel):
     original_source: str
     raw_frame: str
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class IngestResponse(BaseModel):
