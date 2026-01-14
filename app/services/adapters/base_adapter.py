@@ -1,15 +1,31 @@
 """
 Base adapter interface for data source ingestion.
 
-Defines the common contract that all adapters must implement.
+Defines the common contract that all adapters must implement and adds a
+minimal persistence helper used by the full-stack integration tests.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class AdapterIngestMetadata:
+    """Lightweight ingestion metadata returned to callers."""
+    id: int
+    dataset_id: str
+    record_count: int
+    source_type: str
+    format_type: str
+    filename: str
+    file_hash: Optional[str] = None
+    status: str = "completed"  # Default status
 
 
 class ValidationResult:
@@ -54,7 +70,13 @@ class BaseAdapter(ABC):
         4. Optional: transform_coordinates() if not in ICRS J2000
     """
     
-    def __init__(self, source_name: str, dataset_id: Optional[str] = None):
+    def __init__(
+        self,
+        source_name: str,
+        dataset_id: Optional[str] = None,
+        db=None,
+        error_reporter=None,
+    ):
         """
         Initialize adapter.
         
@@ -65,6 +87,8 @@ class BaseAdapter(ABC):
         self.source_name = source_name
         self.dataset_id = dataset_id or self._generate_dataset_id()
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.db = db
+        self.error_reporter = error_reporter
     
     def _generate_dataset_id(self) -> str:
         """Generate a unique dataset ID."""
@@ -194,3 +218,121 @@ class BaseAdapter(ABC):
             Dictionary mapping source columns to unified schema fields
         """
         return {}
+
+    # ------------------------------------------------------------------
+    # Persistence helper used by integration tests
+    # ------------------------------------------------------------------
+    def ingest_file(self, file_path: Any, db=None, error_reporter=None, skip_invalid: bool = True):
+        """
+        Parse, validate, map, and persist a file to the database.
+
+        Returns the created stars and a small metadata object used by tests.
+        """
+
+        # Resolve dependencies lazily to avoid circular imports at module load time
+        from app.services.file_validation import FileValidator
+        from app.repository.star_catalog import StarCatalogRepository
+        from app.repository.dataset_repository import DatasetRepository
+        from app.services.error_reporter import ErrorReporter
+
+        db_session = db or self.db
+        reporter = error_reporter or self.error_reporter
+
+        if db_session is None:
+            raise ValueError("Database session is required for ingest_file")
+
+        path = Path(file_path)
+        validator = FileValidator()
+        validation_result = validator.validate_file(path)
+
+        if not validation_result.is_valid:
+            if reporter:
+                for msg in validation_result.errors:
+                    reporter.log_validation_error(message=msg, dataset_id=self.dataset_id)
+            raise ValueError(f"File validation failed: {validation_result.errors}")
+
+        # Parse, validate, and map records
+        try:
+            valid_records, validation_results = self.process_batch(
+                path,
+                skip_invalid=skip_invalid,
+                encoding=validation_result.encoding or "utf-8",
+            )
+        except ValueError as exc:
+            if reporter:
+                reporter.log_parsing_error(
+                    message=str(exc),
+                    dataset_id=self.dataset_id,
+                    severity="ERROR",
+                )
+            raise
+
+        # Log per-row warnings/errors when available
+        if reporter:
+            for idx, result in enumerate(validation_results):
+                for msg in result.errors:
+                    reporter.log_parsing_error(
+                        message=msg,
+                        dataset_id=self.dataset_id,
+                        source_row=idx + 1,
+                        severity="ERROR",
+                    )
+                for msg in result.warnings:
+                    reporter.log_parsing_error(
+                        message=msg,
+                        dataset_id=self.dataset_id,
+                        source_row=idx + 1,
+                        severity="WARNING",
+                    )
+
+        # Persist stars
+        star_repo = StarCatalogRepository(db_session)
+        db_stars = star_repo.create_bulk(valid_records) if valid_records else []
+
+        # Persist dataset metadata
+        dataset_repo = DatasetRepository(db_session)
+        dataset = dataset_repo.create(
+            {
+                "dataset_id": self.dataset_id,
+                "source_name": self.get_source_type(),
+                "catalog_type": self.get_catalog_type(),
+                "adapter_used": self.__class__.__name__,
+                "schema_version": getattr(self, "schema_version", None),
+                "record_count": len(db_stars),
+                "original_filename": path.name,
+                "file_size_bytes": validation_result.file_size,
+                "file_hash": validation_result.file_hash,
+                "column_mappings": self.get_column_mapping(),
+                "raw_config": self._get_raw_config(),
+                "license_info": self.get_license_info(),
+            }
+        )
+
+        metadata = AdapterIngestMetadata(
+            id=dataset.id,
+            dataset_id=dataset.dataset_id,
+            record_count=dataset.record_count,
+            source_type=self.get_source_type(),
+            format_type=self.get_format_type(path),
+            filename=str(path),
+            file_hash=validation_result.file_hash,
+        )
+
+        return db_stars, metadata
+
+    # These helpers keep adapter-specific details overrideable
+    def get_catalog_type(self) -> str:
+        return self.source_name.lower().split()[0]
+
+    def get_source_type(self) -> str:
+        return self.source_name
+
+    def get_format_type(self, path: Path) -> str:
+        suffix = path.suffix.lower().lstrip('.')
+        return suffix or "unknown"
+
+    def get_license_info(self) -> Optional[str]:
+        return None
+
+    def _get_raw_config(self) -> Optional[dict]:
+        return None
