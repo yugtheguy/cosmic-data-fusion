@@ -279,17 +279,94 @@
 }
 
 .anomaly-item {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 1rem;
     padding: 0.75rem;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 6px;
-    transition: background 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: rowSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+/* Zebra striping with texture */
+.anomaly-item:nth-child(odd) {
+    background:
+        repeating-linear-gradient(90deg,
+            transparent,
+            transparent 4px,
+            rgba(255, 255, 255, 0.008) 4px,
+            rgba(255, 255, 255, 0.008) 8px),
+        rgba(255, 255, 255, 0.02);
+}
+
+.anomaly-item:nth-child(even) {
+    background:
+        repeating-linear-gradient(90deg,
+            rgba(212, 104, 58, 0.02),
+            rgba(212, 104, 58, 0.02) 4px,
+            transparent 4px,
+            transparent 8px),
+        rgba(255, 255, 255, 0.03);
+}
+
+@keyframes rowSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Hover gradient sweep */
+.anomaly-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg,
+            rgba(212, 104, 58, 0.15) 0%,
+            rgba(212, 104, 58, 0.05) 50%,
+            transparent 100%);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 6px;
+}
+
+.anomaly-item:hover::before {
+    width: 100%;
+}
+
+/* Active indicator line */
+.anomaly-item::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 3px;
+    height: 60%;
+    background: var(--accent-primary, #d4683a);
+    border-radius: 0 3px 3px 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(212, 104, 58, 0.5);
+}
+
+.anomaly-item:hover::after {
+    transform: translateY(-50%) scaleY(1);
 }
 
 .anomaly-item:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(212, 104, 58, 0.05);
 }
 
 .anomaly-rank {
@@ -297,6 +374,8 @@
     font-weight: 700;
     color: var(--accent-primary);
     min-width: 30px;
+    position: relative;
+    z-index: 1;
 }
 
 .anomaly-info {
@@ -304,6 +383,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    position: relative;
+    z-index: 1;
 }
 
 .anomaly-id {
@@ -326,6 +407,8 @@
     border-radius: 4px;
     display: flex;
     align-items: center;
+    position: relative;
+    z-index: 1;
 }
 
 .anomaly-item.clickable {
@@ -334,9 +417,7 @@
 }
 
 .anomaly-item.clickable:hover {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateX(4px);
+    border-color: rgba(212, 104, 58, 0.3);
 }
 
 /* Cluster Explorer */

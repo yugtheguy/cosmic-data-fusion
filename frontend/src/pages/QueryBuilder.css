@@ -544,8 +544,9 @@
     padding: 0;
 }
 
-/* Saved Queries */
+/* Saved Queries - Premium Row Styling */
 .saved-query-item {
+    position: relative;
     display: flex;
     align-items: center;
     padding: 0.75rem;
@@ -553,12 +554,86 @@
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 6px;
     margin-bottom: 0.75rem;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: rowSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+/* Zebra striping with texture */
+.saved-query-item:nth-child(odd) {
+    background:
+        repeating-linear-gradient(90deg,
+            transparent,
+            transparent 4px,
+            rgba(255, 255, 255, 0.005) 4px,
+            rgba(255, 255, 255, 0.005) 8px);
+}
+
+.saved-query-item:nth-child(even) {
+    background:
+        repeating-linear-gradient(90deg,
+            rgba(212, 104, 58, 0.015),
+            rgba(212, 104, 58, 0.015) 4px,
+            transparent 4px,
+            transparent 8px);
+}
+
+@keyframes rowSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Hover gradient sweep */
+.saved-query-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg,
+            rgba(212, 104, 58, 0.15) 0%,
+            rgba(212, 104, 58, 0.05) 50%,
+            transparent 100%);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 6px;
+}
+
+.saved-query-item:hover::before {
+    width: 100%;
+}
+
+/* Active indicator line */
+.saved-query-item::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 3px;
+    height: 60%;
+    background: #d4683a;
+    border-radius: 0 3px 3px 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(212, 104, 58, 0.5);
+}
+
+.saved-query-item:hover::after {
+    transform: translateY(-50%) scaleY(1);
 }
 
 .saved-query-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(212, 104, 58, 0.03);
+    border-color: rgba(212, 104, 58, 0.2);
 }
 
 .query-info {
