@@ -96,7 +96,8 @@ async def apply_column_mapping(
         success = mapper.apply_mapping(
             dataset_id=request.dataset_id,
             mapping=request.mapping,
-            confidence_threshold=request.confidence_threshold
+            confidence_threshold=request.confidence_threshold,
+            db_session=db
         )
         
         if not success:
@@ -107,5 +108,7 @@ async def apply_column_mapping(
             "dataset_id": request.dataset_id,
             "applied_mapping": request.mapping
         }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to apply mapping: {str(e)}")

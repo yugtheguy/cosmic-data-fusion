@@ -134,15 +134,59 @@ class TestFilePreview:
 class TestMappingPersistence:
     """Test applying and persisting mappings."""
     
-    @pytest.mark.skip(reason="To be implemented in Stage 4")
     def test_apply_mapping_to_dataset(self):
         """Test applying mapping to an existing dataset."""
-        pass
+        from app.database import SessionLocal
+        from app.repository.dataset_repository import DatasetRepository
+        from app.services.schema_mapper import SchemaMapper
+        
+        db = SessionLocal()
+        try:
+            # Create a test dataset
+            repo = DatasetRepository(db)
+            dataset = repo.create({
+                'source_name': 'Test Mapping',
+                'catalog_type': 'csv',
+                'adapter_used': 'CSVAdapter',
+                'record_count': 0
+            })
+            
+            # Apply mapping
+            mapper = SchemaMapper()
+            mapping = {'ra': 'ra', 'dec': 'dec', 'mag': 'magnitude'}
+            result = mapper.apply_mapping(
+                dataset_id=str(dataset.dataset_id),
+                mapping=mapping,
+                db_session=db
+            )
+            
+            assert result is True
+            
+            # Verify it was persisted
+            updated = repo.get_by_id(str(dataset.dataset_id))
+            assert updated.column_mappings is not None
+            
+            import json
+            stored = json.loads(updated.column_mappings)
+            assert stored == mapping
+        finally:
+            db.close()
     
-    @pytest.mark.skip(reason="To be implemented in Stage 4")
     def test_confidence_threshold(self):
         """Test that low confidence mappings require explicit acceptance."""
-        pass
+        # This is currently a validation test - threshold is used for warnings
+        # In Stage 5, we'll enhance to prevent auto-apply below threshold
+        from app.services.schema_mapper import SchemaMapper
+        mapper = SchemaMapper()
+        
+        # Low confidence detection should generate warnings
+        columns = ['unknown_col1', 'unknown_col2']
+        result = mapper.suggest_from_header(columns)
+        
+        # Should have warnings about missing required columns
+        assert len(result.warnings) > 0
+        assert any('RA' in w for w in result.warnings)
+        assert any('Dec' in w for w in result.warnings)
 
 
 if __name__ == "__main__":

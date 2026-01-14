@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 import pandas as pd
 from pathlib import Path
+import json
 
 
 class StandardColumn(str, Enum):
@@ -443,7 +444,8 @@ class SchemaMapper:
         self,
         dataset_id: str,
         mapping: Dict[str, str],
-        confidence_threshold: float = 0.75
+        confidence_threshold: float = 0.75,
+        db_session = None
     ) -> bool:
         """
         Apply and persist a column mapping to a dataset.
@@ -452,13 +454,45 @@ class SchemaMapper:
             dataset_id: UUID of the dataset
             mapping: Column mapping dictionary (source -> target)
             confidence_threshold: Minimum confidence to auto-apply
+            db_session: Database session (optional, for dependency injection)
             
         Returns:
             True if mapping was applied successfully
         """
-        # TODO: Implement persistence logic
-        # This will be implemented in Stage 4
-        raise NotImplementedError("apply_mapping will be implemented in Stage 4")
+        from app.repository.dataset_repository import DatasetRepository
+        
+        if db_session is None:
+            raise ValueError("Database session is required for apply_mapping")
+        
+        # Get repository
+        repo = DatasetRepository(db_session)
+        
+        # Verify dataset exists
+        dataset = repo.get_by_id(dataset_id)
+        if not dataset:
+            raise ValueError(f"Dataset not found: {dataset_id}")
+        
+        # Validate the mapping
+        valid_targets = {col.value for col in StandardColumn}
+        for source_col, target_col in mapping.items():
+            if target_col not in valid_targets:
+                raise ValueError(f"Invalid target column: {target_col}")
+        
+        # Check required columns are mapped
+        if 'ra' not in mapping.values():
+            raise ValueError("RA column mapping is required")
+        if 'dec' not in mapping.values():
+            raise ValueError("Dec column mapping is required")
+        
+        # Store the mapping as JSON in the column_mappings field
+        update_data = {
+            'column_mappings': json.dumps(mapping)
+        }
+        
+        # Update the dataset
+        updated_dataset = repo.update(dataset_id, update_data)
+        
+        return updated_dataset is not None
     
     def _calculate_confidence(
         self,
