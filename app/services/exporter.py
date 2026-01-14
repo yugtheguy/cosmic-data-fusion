@@ -16,7 +16,7 @@ import csv
 import json
 import logging
 from typing import List, Optional, Union
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 from astropy.table import Table as AstropyTable
@@ -79,7 +79,7 @@ class DataExporter:
             source_name: Name to include in export metadata
         """
         self.source_name = source_name
-        self.export_time = datetime.utcnow().isoformat()
+        self.export_time = datetime.now(timezone.utc).isoformat()
         
         # Convert to DataFrame if needed
         if isinstance(data, pd.DataFrame):

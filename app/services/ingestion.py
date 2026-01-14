@@ -48,13 +48,15 @@ class IngestionService:
     
     def _transform_and_prepare(
         self,
-        star_data: StarIngestRequest
+        star_data: StarIngestRequest,
+        dataset_id: str = None
     ) -> dict:
         """
         Transform coordinates and prepare data for database insertion.
         
         Args:
             star_data: Validated star ingestion request
+            dataset_id: Optional dataset UUID to link this record to
             
         Returns:
             Dictionary ready for UnifiedStarCatalog creation
@@ -70,7 +72,7 @@ class IngestionService:
         )
         
         # Prepare data dictionary for database
-        return {
+        data = {
             "source_id": star_data.source_id,
             "ra_deg": ra_deg,
             "dec_deg": dec_deg,
@@ -78,13 +80,20 @@ class IngestionService:
             "original_source": star_data.original_source,
             "raw_frame": star_data.frame.value,
         }
+        
+        # Add dataset_id if provided
+        if dataset_id:
+            data["dataset_id"] = dataset_id
+        
+        return data
     
-    def ingest_single(self, star_data: StarIngestRequest) -> UnifiedStarCatalog:
+    def ingest_single(self, star_data: StarIngestRequest, dataset_id: str = None) -> UnifiedStarCatalog:
         """
         Ingest a single star observation.
         
         Args:
             star_data: Validated star data with coordinates
+            dataset_id: Optional dataset UUID to link this record to
             
         Returns:
             Created UnifiedStarCatalog record
@@ -98,7 +107,7 @@ class IngestionService:
         )
         
         # Transform and prepare data
-        prepared_data = self._transform_and_prepare(star_data)
+        prepared_data = self._transform_and_prepare(star_data, dataset_id=dataset_id)
         
         # Persist via repository
         db_star = self.repository.create(prepared_data)

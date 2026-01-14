@@ -45,23 +45,32 @@ class EpochHarmonizer:
         """
         self.db = db
     
-    def validate_coordinates(self) -> Dict[str, Any]:
+    def validate_coordinates(self, ra: float = None, dec: float = None) -> tuple[bool, Dict[str, Any]]:
         """
-        Validate all star coordinates in the database.
+        Validate coordinates - can be called for a single coordinate pair or all stars.
         
-        Checks each star for:
-        - RA in valid range [0, 360)
-        - Dec in valid range [-90, +90]
+        Args:
+            ra: Optional RA in degrees. If None, validates all stars in database.
+            dec: Optional Dec in degrees. If None, validates all stars in database.
         
         Returns:
-            Dict with validation report:
-            {
-                "valid_stars": int,
-                "invalid_stars": int,
-                "total_stars": int,
-                "invalid_details": List[Dict] (first 100 invalid entries)
-            }
+            If ra/dec provided: Tuple of (is_valid: bool, error_details: dict)
+            If not provided: Dict with validation report for all stars
         """
+        # Single coordinate validation
+        if ra is not None and dec is not None:
+            issues = []
+            
+            if ra < 0 or ra >= 360:
+                issues.append(f"RA out of range: {ra} (expected [0, 360))")
+            
+            if dec < -90 or dec > 90:
+                issues.append(f"Dec out of range: {dec} (expected [-90, +90])")
+            
+            is_valid = len(issues) == 0
+            return is_valid, {"issues": issues}
+        
+        # Validate all stars in database
         logger.info("Starting coordinate validation...")
         
         stars = self.db.query(UnifiedStarCatalog).all()

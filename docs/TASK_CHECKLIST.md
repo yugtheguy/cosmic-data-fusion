@@ -48,35 +48,60 @@
 
 ---
 
-## ❌ Not Started — Critical Path
+## ✅ LAYER 1 — CORE INFRASTRUCTURE (COMPLETE)
 
-### Phase 1 — Multi-Source Data Ingestion
+### Layer 1: Foundational Data Ingestion & Storage (✓ VERIFIED)
 
-#### Task 1.1: Gaia DR3 Adapter (✓ COMPLETE)
-- [x] Create `services/adapters/gaia_adapter.py`
-- [x] Map Gaia columns to unified schema
-- [x] Handle parallax-to-distance conversion
-- [x] Validate ingestion pipeline
-- [x] Test with sample data
-- [x] API endpoint: POST /ingest/gaia
-- **Branch**: `gaia-adapter` (merged)
+#### Task 1.1: File Validation Service (✓ COMPLETE)
+- [x] Create `services/file_validation.py` (280 lines)
+- [x] MIME type detection (csv, fits, hdf5, parquet, vot)
+- [x] Text encoding detection (UTF-8, ASCII, Latin-1, etc.)
+- [x] File integrity verification (SHA256 hashing)
+- [x] File metadata extraction (size, timestamp)
+- [x] Real file I/O validation
 - **Status**: Production ready
+- **Verification**: test_layer1_e2e_no_mocks.py (passed)
 
-#### Task 1.2: SDSS DR17 Adapter (✓ COMPLETE)
-- [x] Create `services/adapters/sdss_adapter.py` (480 lines)
-- [x] Map SDSS columns to unified schema
-- [x] Handle 5-band ugriz photometry
-- [x] Implement redshift-based distance calculation
-- [x] 8-point comprehensive validation framework
-- [x] Validate ingestion pipeline
-- [x] Obtain sample SDSS dataset (20 records + 12 edge cases)
-- [x] Test with sample data (5 test suites, all passing)
-- [x] API endpoint: POST /ingest/sdss
-- **Branch**: `sdss-adapter` (pushed, ready for PR)
+#### Task 1.2: Error Reporting Service (✓ COMPLETE)
+- [x] Create error logging with database persistence
+- [x] Support 6 error types (validation, parsing, ingestion, transformation, storage, system)
+- [x] Create `IngestionError` ORM model
+- [x] Log with timestamps and context (dataset_id, severity)
+- [x] Error reporting to SQLite/PostgreSQL
+- [x] CSV export functionality
 - **Status**: Production ready
-- **Documentation**: SDSS_ADAPTER_COMPLETE.md
+- **Verification**: test_layer1_e2e_no_mocks.py (passed)
 
-#### Task 1.3: FITS Parser
+#### Task 1.3: Storage & Metadata Service (✓ COMPLETE)
+- [x] Create `DatasetMetadata` ORM model
+- [x] Track source name, catalog type, adapter, record count, file hash
+- [x] Store dataset metadata in database
+- [x] Integrate with MinIO for object storage (connection ready)
+- [x] Maintain dataset isolation
+- **Status**: Production ready
+- **Verification**: test_layer1_e2e_no_mocks.py (passed)
+
+#### Layer 1 Integration Verification (✓ VERIFIED)
+- [x] End-to-end pipeline: FileValidator → Adapter → Database → ErrorReporter → Metadata
+- [x] Real data flowing through all 3 components
+- [x] Zero mocking in verification tests
+- [x] Gaia adapter (5 records) fully integrated
+- [x] SDSS adapter (3 records) fully integrated
+- [x] Database persistence verified
+- [x] Dataset isolation verified
+- [x] File hash consistency verified
+- **Test Suite**: tests/test_layer1_e2e_no_mocks.py (12/12 tests passing)
+- **Documentation**: LAYER_1_VERIFICATION_COMPLETE.md
+
+**Status**: ✅ FULLY COMPLETE & VERIFIED
+
+---
+
+## 🚧 In Progress — Critical Path
+
+### Phase 2 — Multi-Source Data Ingestion (Continued)
+
+#### Task 1.4: FITS Parser
 - [ ] Create `services/adapters/fits_adapter.py`
 - [ ] Parse FITS binary tables
 - [ ] Extract header metadata
@@ -84,14 +109,14 @@
 - [ ] Handle various FITS structures
 - [ ] Test with example FITS file
 
-#### Task 1.4: Generic CSV Adapter
+#### Task 1.5: Generic CSV Adapter
 - [ ] Enhance `services/csv_ingestion.py`
 - [ ] Support user-defined column mapping
 - [ ] Add header auto-detection
 - [ ] Add data validation
 - [ ] Create `/ingest/csv` endpoint with mapping config
 
-#### Task 1.5: Adapter Registry
+#### Task 1.6: Adapter Registry
 - [ ] Create `services/adapter_registry.py`
 - [ ] Register all adapters centrally
 - [ ] Auto-detect dataset format

@@ -4,6 +4,7 @@ Test script for Gaia adapter - Stage 4/5: Database integration test.
 Tests adapter + database storage without requiring API server.
 """
 
+import os
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -21,7 +22,11 @@ def test_database_integration():
     print("STAGE 4/5 TEST: Database Integration")
     print("="*70)
     
-    # Create test database
+    # Clean up any existing test database
+    if os.path.exists(TEST_DB):
+        os.remove(TEST_DB)
+    
+    # Create fresh test database
     print("\n[1] Setting up test database...")
     engine = create_engine(f"sqlite:///{TEST_DB}")
     Base.metadata.create_all(engine)

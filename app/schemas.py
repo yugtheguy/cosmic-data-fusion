@@ -11,6 +11,14 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
+# Import dataset schemas
+from app.dataset_schemas import (
+    DatasetRegisterRequest,
+    DatasetMetadataResponse,
+    DatasetListResponse,
+    DatasetRegistryStats
+)
+
 
 class CoordinateFrame(str, Enum):
     """
@@ -102,6 +110,18 @@ class BulkIngestRequest(BaseModel):
         max_length=10000,
         description="List of stars to ingest"
     )
+
+
+class AutoIngestResponse(BaseModel):
+    """Response schema for automatic file ingestion with adapter detection."""
+    
+    message: str = Field(..., description="Status message")
+    adapter_used: str = Field(..., description="Name of the adapter that was auto-detected")
+    adapter_confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence score")
+    detection_method: str = Field(..., description="Method used for detection (magic_bytes, extension, content_analysis)")
+    records_ingested: int = Field(..., ge=0, description="Number of records successfully ingested")
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================
@@ -351,3 +371,57 @@ class CatalogStatsResponse(BaseModel):
     coordinate_ranges: CoordinateRanges = Field(description="RA/Dec coverage")
     brightness: BrightnessStats = Field(description="Magnitude statistics")
     sources: List[SourceCount] = Field(description="Stars per source catalog")
+
+
+# ============================================================
+# SCHEMA MAPPER SCHEMAS
+# ============================================================
+
+class SuggestFromHeadersRequest(BaseModel):
+    """Request to suggest mappings from column headers."""
+    columns: List[str] = Field(description="List of column names from source file")
+    existing_mapping: Optional[dict] = Field(default=None, description="Optional existing mapping to preserve")
+
+
+class ColumnSuggestionResponse(BaseModel):
+    """A single column mapping suggestion with confidence."""
+    source_column: str = Field(description="Original column name from source file")
+    target_column: str = Field(description="Target standard column name (ra, dec, etc.)")
+    confidence: float = Field(description="Confidence score (0.0-1.0)", ge=0.0, le=1.0)
+    confidence_level: str = Field(description="Confidence level: high, medium, low")
+    reason: str = Field(description="Explanation for this mapping suggestion")
+
+
+class MappingSuggestionResponse(BaseModel):
+    """Complete mapping suggestion for a dataset."""
+    mappings: dict = Field(description="Recommended source->target column mappings")
+    suggestions: List[ColumnSuggestionResponse] = Field(description="Detailed suggestions with confidence")
+    unmapped_columns: List[str] = Field(description="Columns that couldn't be mapped")
+    warnings: List[str] = Field(description="Warnings about low confidence or ambiguity")
+
+
+class PreviewMappingRequest(BaseModel):
+    """Request to preview mapping suggestions for a file."""
+    file_path: str = Field(description="Absolute path to the file to analyze")
+    sample_size: int = Field(default=100, description="Number of rows to sample", ge=1, le=1000)
+    existing_mapping: Optional[dict] = Field(default=None, description="Optional existing mapping to preserve")
+
+
+class ApplyMappingRequest(BaseModel):
+    """Request to apply and persist a column mapping."""
+    dataset_id: str = Field(description="UUID of the dataset")
+    mapping: dict = Field(description="Column mapping dict (source_column -> target_column)")
+    confidence_threshold: float = Field(default=0.75, description="Minimum confidence to accept", ge=0.0, le=1.0)
+
+
+class ValidateMappingRequest(BaseModel):
+    """Request to validate a column mapping without applying it."""
+    mapping: dict = Field(description="Column mapping dict to validate")
+    min_confidence: float = Field(default=0.75, description="Minimum confidence threshold", ge=0.0, le=1.0)
+
+
+class ValidateMappingResponse(BaseModel):
+    """Response from mapping validation."""
+    is_valid: bool = Field(description="Whether the mapping is valid")
+    issues: List[str] = Field(description="List of validation issues")
+    warnings: List[str] = Field(default=[], description="Non-critical warnings")

@@ -19,6 +19,10 @@ from app.database import get_db
 from app.schemas import (
     GaiaLoadResponse,
     DatasetStatsResponse,
+    DatasetRegisterRequest,
+    DatasetMetadataResponse,
+    DatasetListResponse,
+    DatasetRegistryStats,
 )
 from app.services.gaia_ingestion import GaiaIngestionService
 from app.services.csv_ingestion import CSVIngestionError
@@ -150,4 +154,240 @@ def get_gaia_stats(
         raise HTTPException(
             status_code=500,
             detail=f"Database error: {str(e)}"
+        )
+
+
+# ============================================================
+# DATASET REGISTRY ENDPOINTS
+# ============================================================
+
+@router.post(
+    "/register",
+    response_model=DatasetMetadataResponse,
+    status_code=201,
+    summary="Register a new dataset",
+    description="""
+Register a new dataset in the system.
+
+This endpoint creates a metadata entry for a dataset that will be ingested.
+Returns the generated dataset_id which should be used when ingesting records.
+
+**Use Cases**:
+- Pre-register a dataset before ingestion starts
+- Track file uploads and their metadata
+- Enable dataset attribution and provenance
+    """
+)
+def register_dataset(
+    dataset: DatasetRegisterRequest,
+    db: Session = Depends(get_db)
+):
+    """Register a new dataset in the metadata registry."""
+    from app.repository.dataset_repository import DatasetRepository
+    
+    try:
+        repo = DatasetRepository(db)
+        
+        # Check for duplicate filename
+        if dataset.original_filename:
+            existing = repo.get_by_filename(dataset.original_filename)
+            if existing:
+                logger.warning(f"Dataset with filename '{dataset.original_filename}' already exists")
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Dataset with filename '{dataset.original_filename}' already registered"
+                )
+        
+        # Create dataset metadata
+        dataset_data = dataset.model_dump()
+        db_dataset = repo.create(dataset_data)
+        
+        logger.info(f"Registered new dataset: {db_dataset.dataset_id}")
+        return db_dataset
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering dataset: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to register dataset: {str(e)}"
+        )
+
+
+@router.get(
+    "",
+    response_model=DatasetListResponse,
+    summary="List all datasets",
+    description="""
+List all registered datasets with pagination.
+
+**Query Parameters**:
+- `catalog_type`: Filter by catalog type (gaia, sdss, fits, csv)
+- `limit`: Number of results per page (default: 100, max: 1000)
+- `offset`: Pagination offset (default: 0)
+
+Returns datasets sorted by ingestion time (newest first).
+    """
+)
+def list_datasets(
+    catalog_type: str = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """List all datasets with optional filtering and pagination."""
+    from app.repository.dataset_repository import DatasetRepository
+    
+    try:
+        # Validate pagination params
+        if limit < 1 or limit > 1000:
+            raise HTTPException(status_code=400, detail="Limit must be between 1 and 1000")
+        if offset < 0:
+            raise HTTPException(status_code=400, detail="Offset must be non-negative")
+        
+        repo = DatasetRepository(db)
+        
+        datasets = repo.list_all(catalog_type=catalog_type, limit=limit, offset=offset)
+        total = repo.count_all(catalog_type=catalog_type)
+        
+        return DatasetListResponse(
+            datasets=datasets,
+            total=total,
+            limit=limit,
+            offset=offset
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing datasets: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list datasets: {str(e)}"
+        )
+
+
+@router.get(
+    "/statistics",
+    response_model=DatasetRegistryStats,
+    summary="Get dataset statistics",
+    description="""
+Get comprehensive statistics about all registered datasets.
+
+Returns:
+- Total number of datasets
+- Total records across all datasets  
+- Breakdown by catalog type (gaia, sdss, fits, csv)
+
+Useful for dashboard overview and system health monitoring.
+    """
+)
+def get_dataset_statistics(db: Session = Depends(get_db)):
+    """Get statistics about all datasets."""
+    from app.repository.dataset_repository import DatasetRepository
+    
+    try:
+        repo = DatasetRepository(db)
+        stats = repo.get_statistics()
+        
+        return DatasetRegistryStats(**stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting dataset statistics: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get statistics: {str(e)}"
+        )
+
+
+@router.get(
+    "/{dataset_id}",
+    response_model=DatasetMetadataResponse,
+    summary="Get dataset by ID",
+    description="""
+Retrieve metadata for a specific dataset by its UUID.
+
+Returns complete metadata including:
+- Source information
+- Record counts
+- Column mappings
+- Configuration
+- Timestamps
+
+Returns 404 if dataset not found.
+    """
+)
+def get_dataset(
+    dataset_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get a specific dataset by its UUID."""
+    from app.repository.dataset_repository import DatasetRepository
+    
+    try:
+        repo = DatasetRepository(db)
+        dataset = repo.get_by_id(dataset_id)
+        
+        if not dataset:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Dataset '{dataset_id}' not found"
+            )
+        
+        return dataset
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving dataset {dataset_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve dataset: {str(e)}"
+        )
+
+
+@router.delete(
+    "/{dataset_id}",
+    status_code=204,
+    summary="Delete dataset",
+    description="""
+Delete a dataset metadata record.
+
+**WARNING**: This only deletes the metadata entry, NOT the associated
+star records. Star records will remain in the database with their
+dataset_id field set to the deleted ID.
+
+Consider implementing soft delete or cascade deletion based on your needs.
+
+Returns 404 if dataset not found.
+    """
+)
+def delete_dataset(
+    dataset_id: str,
+    db: Session = Depends(get_db)
+):
+    """Delete a dataset metadata record."""
+    from app.repository.dataset_repository import DatasetRepository
+    
+    try:
+        repo = DatasetRepository(db)
+        deleted = repo.delete(dataset_id)
+        
+        if not deleted:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Dataset '{dataset_id}' not found"
+            )
+        
+        logger.info(f"Deleted dataset: {dataset_id}")
+        # 204 No Content - don't return anything
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting dataset {dataset_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete dataset: {str(e)}"
         )

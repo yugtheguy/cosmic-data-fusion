@@ -10,6 +10,7 @@ All business logic is delegated to the service layer.
 
 import logging
 from typing import List
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
@@ -22,8 +23,15 @@ from app.schemas import (
     StarResponse,
     IngestResponse,
     BulkIngestResponse,
+    AutoIngestResponse,
+    CoordinateFrame,
 )
 from app.services.ingestion import IngestionService
+from app.services.adapter_registry import registry, AdapterDetectionError
+from app.services.file_validation import FileValidator, FileValidationError
+from app.services.error_reporter import ErrorReporter
+from app.services.storage import StorageService, StorageConfiguration
+from app.models import DatasetMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -184,13 +192,45 @@ async def ingest_gaia(
     """
     from app.services.adapters.gaia_adapter import GaiaAdapter
     from app.models import UnifiedStarCatalog
-    from io import BytesIO
     
     logger.info(f"Received Gaia ingestion request: file={file.filename}")
     
+    error_reporter = ErrorReporter(db)
+    validator = FileValidator()
+    
     try:
-        # Read uploaded file content
+        # 1. VALIDATE FILE
+        # Read file content for validation
         content = await file.read()
+        
+        # Validate file using FileValidator
+        validation_result = validator.validate_file(
+            file_obj=BytesIO(content),
+            filename=file.filename
+        )
+        
+        if not validation_result.is_valid:
+            error_msg = "; ".join(validation_result.errors)
+            logger.error(f"File validation failed for {file.filename}: {error_msg}")
+            
+            # Log validation error for tracking
+            error_reporter.log_validation_error(
+                message=f"File validation failed: {error_msg}",
+                dataset_id=dataset_id,
+                details={
+                    "filename": file.filename,
+                    "file_size": len(content),
+                    "errors": validation_result.errors
+                },
+                severity="ERROR"
+            )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=f"File validation failed: {error_msg}"
+            )
+        
+        # 2. PROCESS WITH ADAPTER
         file_obj = BytesIO(content)
         
         # Initialize Gaia adapter
@@ -203,15 +243,29 @@ async def ingest_gaia(
         )
         
         if not valid_records:
+            error_msg = "No valid records found in uploaded file"
+            logger.warning(f"{error_msg}: {file.filename}")
+            
+            # Log parsing errors
+            for idx, result in enumerate(validation_results):
+                if result.errors:
+                    error_reporter.log_parsing_error(
+                        message=f"Record parsing error: {result.errors[0]}",
+                        dataset_id=adapter.dataset_id,
+                        source_row=idx + 2,  # +2 for header + 0-indexing
+                        details={"all_errors": result.errors},
+                        severity="ERROR"
+                    )
+            
             return {
                 "success": False,
-                "message": "No valid records found in uploaded file",
+                "message": error_msg,
                 "ingested_count": 0,
                 "failed_count": len(validation_results),
                 "dataset_id": adapter.dataset_id
             }
         
-        # Insert records into database
+        # 3. INSERT INTO DATABASE
         db_records = []
         for record in valid_records:
             db_record = UnifiedStarCatalog(**record)
@@ -222,6 +276,43 @@ async def ingest_gaia(
         db.commit()
         
         logger.info(f"Successfully ingested {len(db_records)} Gaia records")
+        
+        # 4. STORE FILE IN MINIO
+        try:
+            storage = StorageService(StorageConfiguration())
+            storage_key = storage.upload_file(
+                file_content=content,
+                filename=file.filename,
+                dataset_id=adapter.dataset_id,
+                content_type=file.content_type or "application/octet-stream",
+                file_hash=validation_result.file_hash
+            )
+            logger.info(f"File stored at: {storage_key}")
+        except Exception as e:
+            logger.warning(f"Failed to store file in MinIO: {e}")
+            storage_key = None
+        
+        # 5. CREATE DATASET METADATA RECORD
+        try:
+            dataset = DatasetMetadata(
+                dataset_id=adapter.dataset_id,
+                source_name=file.filename,
+                catalog_type="gaia",
+                adapter_used="GaiaAdapter",
+                schema_version=getattr(adapter, 'schema_version', None),
+                record_count=len(db_records),
+                original_filename=file.filename,
+                file_size_bytes=len(content),
+                file_hash=validation_result.file_hash,
+                storage_key=storage_key,
+                license_info="ESA/Gaia DPAC"
+            )
+            db.add(dataset)
+            db.commit()
+            logger.info(f"Created dataset metadata: {adapter.dataset_id}")
+        except Exception as e:
+            logger.error(f"Failed to create dataset metadata: {e}")
+            db.rollback()
         
         # Collect validation warnings
         warnings = []
@@ -241,11 +332,27 @@ async def ingest_gaia(
             "ingested_count": len(db_records),
             "failed_count": len(validation_results) - len(valid_records),
             "dataset_id": adapter.dataset_id,
-            "file_name": file.filename
+            "file_name": file.filename,
+            "file_hash": validation_result.file_hash,
+            "storage_key": storage_key
         }
+        
+    except FileValidationError as e:
+        logger.error(f"File validation error: {e}")
+        error_reporter.log_validation_error(
+            message=f"File validation error: {str(e)}",
+            dataset_id=dataset_id,
+            details={"filename": file.filename}
+        )
+        raise HTTPException(status_code=400, detail=f"File validation error: {str(e)}")
         
     except ValueError as e:
         logger.error(f"Data validation/parsing error: {e}")
+        error_reporter.log_parsing_error(
+            message=f"Data parsing error: {str(e)}",
+            dataset_id=dataset_id,
+            details={"filename": file.filename}
+        )
         raise HTTPException(
             status_code=400,
             detail=f"Invalid data: {str(e)}"
@@ -253,6 +360,11 @@ async def ingest_gaia(
         
     except SQLAlchemyError as e:
         logger.error(f"Database error during Gaia ingestion: {e}")
+        error_reporter.log_database_error(
+            message=f"Database insertion error: {str(e)}",
+            dataset_id=dataset_id,
+            details={"filename": file.filename}
+        )
         db.rollback()
         raise HTTPException(
             status_code=500,
@@ -261,6 +373,12 @@ async def ingest_gaia(
         
     except Exception as e:
         logger.error(f"Unexpected error during Gaia ingestion: {e}")
+        error_reporter.log_error(
+            error_type="DATABASE",
+            message=f"Unexpected error during ingestion: {str(e)}",
+            dataset_id=dataset_id,
+            details={"filename": file.filename}
+        )
         db.rollback()
         raise HTTPException(
             status_code=500,
@@ -300,13 +418,45 @@ async def ingest_sdss(
     """
     from app.services.adapters.sdss_adapter import SDSSAdapter
     from app.models import UnifiedStarCatalog
-    from io import BytesIO
     
     logger.info(f"Received SDSS ingestion request: file={file.filename}")
     
+    error_reporter = ErrorReporter(db)
+    validator = FileValidator()
+    
     try:
-        # Read uploaded file content
+        # 1. VALIDATE FILE
+        # Read file content for validation
         content = await file.read()
+        
+        # Validate file using FileValidator
+        validation_result = validator.validate_file(
+            file_obj=BytesIO(content),
+            filename=file.filename
+        )
+        
+        if not validation_result.is_valid:
+            error_msg = "; ".join(validation_result.errors)
+            logger.error(f"File validation failed for {file.filename}: {error_msg}")
+            
+            # Log validation error for tracking
+            error_reporter.log_validation_error(
+                message=f"File validation failed: {error_msg}",
+                dataset_id=dataset_id,
+                details={
+                    "filename": file.filename,
+                    "file_size": len(content),
+                    "errors": validation_result.errors
+                },
+                severity="ERROR"
+            )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=f"File validation failed: {error_msg}"
+            )
+        
+        # 2. PROCESS WITH ADAPTER
         file_obj = BytesIO(content)
         
         # Initialize SDSS adapter
@@ -319,15 +469,29 @@ async def ingest_sdss(
         )
         
         if not valid_records:
+            error_msg = "No valid records found in uploaded file"
+            logger.warning(f"{error_msg}: {file.filename}")
+            
+            # Log parsing errors
+            for idx, result in enumerate(validation_results):
+                if result.errors:
+                    error_reporter.log_parsing_error(
+                        message=f"Record parsing error: {result.errors[0]}",
+                        dataset_id=adapter.dataset_id,
+                        source_row=idx + 2,  # +2 for header + 0-indexing
+                        details={"all_errors": result.errors},
+                        severity="ERROR"
+                    )
+            
             return {
                 "success": False,
-                "message": "No valid records found in uploaded file",
+                "message": error_msg,
                 "ingested_count": 0,
                 "failed_count": len(validation_results),
                 "dataset_id": adapter.dataset_id
             }
         
-        # Insert records into database
+        # 3. INSERT INTO DATABASE
         db_records = []
         for record in valid_records:
             db_record = UnifiedStarCatalog(**record)
@@ -338,6 +502,43 @@ async def ingest_sdss(
         db.commit()
         
         logger.info(f"Successfully ingested {len(db_records)} SDSS records")
+        
+        # 4. STORE FILE IN MINIO
+        try:
+            storage = StorageService(StorageConfiguration())
+            storage_key = storage.upload_file(
+                file_content=content,
+                filename=file.filename,
+                dataset_id=adapter.dataset_id,
+                content_type=file.content_type or "application/octet-stream",
+                file_hash=validation_result.file_hash
+            )
+            logger.info(f"File stored at: {storage_key}")
+        except Exception as e:
+            logger.warning(f"Failed to store file in MinIO: {e}")
+            storage_key = None
+        
+        # 5. CREATE DATASET METADATA RECORD
+        try:
+            dataset = DatasetMetadata(
+                dataset_id=adapter.dataset_id,
+                source_name=file.filename,
+                catalog_type="sdss",
+                adapter_used="SDSSAdapter",
+                schema_version=getattr(adapter, 'schema_version', None),
+                record_count=len(db_records),
+                original_filename=file.filename,
+                file_size_bytes=len(content),
+                file_hash=validation_result.file_hash,
+                storage_key=storage_key,
+                license_info="SDSS DR17"
+            )
+            db.add(dataset)
+            db.commit()
+            logger.info(f"Created dataset metadata: {adapter.dataset_id}")
+        except Exception as e:
+            logger.error(f"Failed to create dataset metadata: {e}")
+            db.rollback()
         
         # Collect validation warnings
         warnings = []
@@ -357,11 +558,27 @@ async def ingest_sdss(
             "ingested_count": len(db_records),
             "failed_count": len(validation_results) - len(valid_records),
             "dataset_id": adapter.dataset_id,
-            "file_name": file.filename
+            "file_name": file.filename,
+            "file_hash": validation_result.file_hash,
+            "storage_key": storage_key
         }
+        
+    except FileValidationError as e:
+        logger.error(f"File validation error: {e}")
+        error_reporter.log_validation_error(
+            message=f"File validation error: {str(e)}",
+            dataset_id=dataset_id,
+            details={"filename": file.filename}
+        )
+        raise HTTPException(status_code=400, detail=f"File validation error: {str(e)}")
         
     except ValueError as e:
         logger.error(f"Data validation/parsing error: {e}")
+        error_reporter.log_parsing_error(
+            message=f"Data parsing error: {str(e)}",
+            dataset_id=dataset_id,
+            details={"filename": file.filename}
+        )
         raise HTTPException(
             status_code=400,
             detail=f"Invalid data: {str(e)}"
@@ -369,6 +586,11 @@ async def ingest_sdss(
         
     except SQLAlchemyError as e:
         logger.error(f"Database error during SDSS ingestion: {e}")
+        error_reporter.log_database_error(
+            message=f"Database insertion error: {str(e)}",
+            dataset_id=dataset_id,
+            details={"filename": file.filename}
+        )
         db.rollback()
         raise HTTPException(
             status_code=500,
@@ -377,6 +599,12 @@ async def ingest_sdss(
         
     except Exception as e:
         logger.error(f"Unexpected error during SDSS ingestion: {e}")
+        error_reporter.log_error(
+            error_type="DATABASE",
+            message=f"Unexpected error during ingestion: {str(e)}",
+            dataset_id=dataset_id,
+            details={"filename": file.filename}
+        )
         db.rollback()
         raise HTTPException(
             status_code=500,
@@ -697,3 +925,191 @@ def ingest_csv_file(
             detail=f"Unexpected error: {str(e)}"
         )
 
+
+@router.post(
+    "/auto",
+    response_model=AutoIngestResponse,
+    summary="Auto-detect and ingest file",
+    description=(
+        "Automatically detect the file type and use the appropriate adapter for ingestion. "
+        "Supports FITS, CSV, Gaia DR3, and SDSS DR17 formats. "
+        "Detection uses magic bytes, file extensions, and content analysis."
+    )
+)
+async def ingest_auto(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+) -> AutoIngestResponse:
+    """
+    Auto-detect file type and ingest using the appropriate adapter.
+    
+    The system will:
+    1. Analyze the uploaded file using multiple detection strategies
+    2. Select the best matching adapter based on confidence score
+    3. Parse and ingest the data using the detected adapter
+    4. Return ingestion results with detection information
+    
+    Detection Methods (in priority order):
+    - Magic bytes (binary file headers) - highest confidence (0.99)
+    - File extension matching - high confidence (0.90-0.95)
+    - Content analysis (column names) - medium confidence (0.75-0.80)
+    
+    Args:
+        file: Uploaded file (any supported format)
+        db: Database session
+        
+    Returns:
+        AutoIngestResponse with adapter information and ingestion results
+        
+    Raises:
+        HTTPException 400: If file type cannot be detected or parsing fails
+        HTTPException 500: If database error occurs
+    """
+    import tempfile
+    import os
+    
+    temp_path = None
+    
+    try:
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=os.path.splitext(file.filename or '')[1]
+        ) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        # Get file size
+        file_size = len(content)
+        
+        logger.info(f"Processing auto-ingestion for file: {file.filename}")
+        
+        # Auto-detect adapter
+        try:
+            adapter_name, confidence, method = registry.detect_adapter(
+                temp_path,
+                confidence_threshold=0.60
+            )
+            logger.info(
+                f"Detected adapter: {adapter_name} "
+                f"(confidence: {confidence:.2f}, method: {method})"
+            )
+        except AdapterDetectionError as e:
+            logger.warning(f"Adapter detection failed: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not detect file type: {e.message}"
+            )
+        
+        # Register dataset first
+        from app.repository.dataset_repository import DatasetRepository
+        from app.schemas import DatasetRegisterRequest
+        
+        dataset_repo = DatasetRepository(db)
+        
+        # Determine catalog type from adapter name
+        catalog_type_map = {
+            "GaiaAdapter": "gaia",
+            "SDSSAdapter": "sdss",
+            "FITSAdapter": "fits",
+            "CSVAdapter": "csv",
+            "csv": "csv",  # Handle lowercase adapter name
+            "fits": "fits",
+            "gaia": "gaia",
+            "sdss": "sdss"
+        }
+        catalog_type = catalog_type_map.get(adapter_name, "unknown")
+        
+        # Register the dataset
+        dataset_data = DatasetRegisterRequest(
+            source_name=file.filename or "Unknown",
+            catalog_type=catalog_type,
+            adapter_used=adapter_name,
+            original_filename=file.filename,
+            file_size_bytes=file_size
+        )
+        db_dataset = dataset_repo.create(dataset_data.model_dump())
+        dataset_id = db_dataset.dataset_id
+        
+        logger.info(f"Registered dataset with ID: {dataset_id}")
+        
+        # Get adapter class and instantiate
+        adapter_class = registry.get_adapter(adapter_name)
+        adapter = adapter_class()
+        
+        # Process file using adapter (parse, validate, map)
+        try:
+            unified_records, validation_results = adapter.process_batch(
+                temp_path,
+                skip_invalid=False
+            )
+        except Exception as e:
+            logger.error(f"Processing failed with {adapter_name} adapter: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to process file with {adapter_name} adapter: {str(e)}"
+            )
+        
+        # Ingest into database
+        try:
+            ingestion_service = IngestionService(db)
+            records_ingested = 0
+            
+            # Convert unified records (dicts) to StarIngestRequest objects
+            for record in unified_records:
+                star_request = StarIngestRequest(
+                    source_id=record.get('source_id', ''),
+                    coord1=record.get('ra_deg', 0.0),
+                    coord2=record.get('dec_deg', 0.0),
+                    brightness_mag=record.get('brightness_mag'),
+                    original_source=record.get('original_source', adapter_name),
+                    frame=CoordinateFrame.ICRS  # Adapters already return ICRS
+                )
+                # Ingest with dataset_id
+                ingestion_service.ingest_single(star_request, dataset_id=dataset_id)
+                records_ingested += 1
+            
+            # Update dataset record count
+            dataset_repo.update_record_count(dataset_id, records_ingested)
+            
+            db.commit()
+            logger.info(
+                f"Successfully ingested {records_ingested} records "
+                f"using {adapter_name} adapter for dataset {dataset_id}"
+            )
+            
+            return AutoIngestResponse(
+                message=f"Successfully ingested {records_ingested} records",
+                adapter_used=adapter_name,
+                adapter_confidence=confidence,
+                detection_method=method,
+                records_ingested=records_ingested
+            )
+            
+        except Exception as e:
+            logger.error(f"Ingestion failed: {e}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database ingestion failed: {str(e)}"
+            )
+    
+    except HTTPException:
+        raise
+    
+    except Exception as e:
+        logger.error(f"Unexpected error during auto-ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
+    
+    finally:
+        # Clean up temporary file
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {temp_path}: {e}")

@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 from io import StringIO
 
+from sqlalchemy.orm import Session
+
 from app.services.adapters.base_adapter import BaseAdapter, ValidationResult
 from app.services.utils.unit_converter import UnitConverter
 
@@ -70,18 +72,25 @@ class SDSSAdapter(BaseAdapter):
     
     def __init__(
         self,
+        db: Optional[Session] = None,
+        error_reporter=None,
         dataset_id: Optional[str] = None,
-        apply_extinction_correction: bool = False
+        apply_extinction_correction: bool = False,
     ):
-        """
-        Initialize SDSS adapter.
-        
-        Args:
-            dataset_id: Optional dataset identifier
-            apply_extinction_correction: Whether to apply Galactic extinction correction
-                                         to magnitudes (not implemented yet)
-        """
-        super().__init__(source_name="SDSS DR17", dataset_id=dataset_id)
+        """Initialize SDSS adapter with optional DB + error reporter."""
+        db_session = db if isinstance(db, Session) else None
+        dataset_value = None
+        if isinstance(db, str):
+            dataset_value = db
+        elif dataset_id:
+            dataset_value = dataset_id
+
+        super().__init__(
+            source_name="SDSS DR17",
+            dataset_id=dataset_value,
+            db=db_session,
+            error_reporter=error_reporter,
+        )
         self.apply_extinction_correction = apply_extinction_correction
         
         if apply_extinction_correction:
@@ -157,8 +166,8 @@ class SDSSAdapter(BaseAdapter):
                 reader = csv.DictReader(lines)
                 
                 for row_num, row in enumerate(reader, start=1):
-                    # Clean up whitespace in values
-                    cleaned_row = {k.strip(): v.strip() if isinstance(v, str) else v 
+                    # Clean up whitespace AND normalize column names to lowercase
+                    cleaned_row = {k.strip().lower(): v.strip() if isinstance(v, str) else v 
                                    for k, v in row.items()}
                     records.append(cleaned_row)
                     
@@ -192,8 +201,8 @@ class SDSSAdapter(BaseAdapter):
             reader = csv.DictReader(lines)
             
             for row in reader:
-                # Clean up whitespace
-                cleaned_row = {k.strip(): v.strip() if isinstance(v, str) else v 
+                # Clean up whitespace AND normalize column names to lowercase
+                cleaned_row = {k.strip().lower(): v.strip() if isinstance(v, str) else v 
                                for k, v in row.items()}
                 records.append(cleaned_row)
             
@@ -245,8 +254,8 @@ class SDSSAdapter(BaseAdapter):
         except (ValueError, TypeError) as e:
             result.add_error(f"Invalid RA/Dec values: {e}")
         
-        # Check 3: At least one magnitude present
-        mag_fields = ['psfMag_u', 'psfMag_g', 'psfMag_r', 'psfMag_i', 'psfMag_z']
+        # Check 3: At least one magnitude present (columns are lowercased in parsing)
+        mag_fields = ['psfmag_u', 'psfmag_g', 'psfmag_r', 'psfmag_i', 'psfmag_z']
         has_magnitude = False
         
         for mag_field in mag_fields:
@@ -359,10 +368,11 @@ class SDSSAdapter(BaseAdapter):
         dec = float(record.get('dec', 0))
         
         # Use g-band magnitude as primary brightness (most analogous to Gaia G-band)
+        # Note: Column names are lowercased during parsing
         brightness_mag = None
-        if 'psfMag_g' in record and record['psfMag_g'] not in [None, '', 'null', 'NULL']:
+        if 'psfmag_g' in record and record['psfmag_g'] not in [None, '', 'null', 'NULL']:
             try:
-                brightness_mag = float(record['psfMag_g'])
+                brightness_mag = float(record['psfmag_g'])
             except (ValueError, TypeError):
                 pass
         
@@ -395,8 +405,9 @@ class SDSSAdapter(BaseAdapter):
         raw_metadata = {}
         
         # Preserve all five magnitudes (ugriz)
+        # Note: Column names are lowercased during parsing
         for band in ['u', 'g', 'r', 'i', 'z']:
-            mag_field = f'psfMag_{band}'
+            mag_field = f'psfmag_{band}'
             if mag_field in record and record[mag_field] not in [None, '', 'null', 'NULL']:
                 try:
                     raw_metadata[mag_field] = float(record[mag_field])
@@ -459,3 +470,12 @@ class SDSSAdapter(BaseAdapter):
             'dataset_id': self.dataset_id,
             'raw_metadata': raw_metadata
         }
+    def get_catalog_type(self) -> str:
+        return "sdss"
+
+    def get_source_type(self) -> str:
+        # Tests expect the short source label
+        return "SDSS"
+
+    def _get_raw_config(self) -> Optional[dict]:
+        return {"apply_extinction_correction": self.apply_extinction_correction}

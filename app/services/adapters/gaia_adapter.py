@@ -14,8 +14,10 @@ import csv
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from io import StringIO
+
+from sqlalchemy.orm import Session
 
 from app.services.adapters.base_adapter import BaseAdapter, ValidationResult
 from app.services.utils.unit_converter import UnitConverter
@@ -61,18 +63,29 @@ class GaiaAdapter(BaseAdapter):
     
     def __init__(
         self,
+        db: Optional[Session] = None,
+        error_reporter=None,
         dataset_id: Optional[str] = None,
-        apply_parallax_correction: bool = False
+        apply_parallax_correction: bool = False,
     ):
+        """Initialize Gaia adapter.
+
+        Accepts either a dataset_id (legacy usage) or a SQLAlchemy Session as the
+        first positional argument (new usage from full-stack tests).
         """
-        Initialize Gaia adapter.
-        
-        Args:
-            dataset_id: Optional dataset identifier
-            apply_parallax_correction: Whether to apply parallax zero-point correction
-                                      (Gaia DR3 has ~-17 µas offset, not implemented yet)
-        """
-        super().__init__(source_name="Gaia DR3", dataset_id=dataset_id)
+        db_session = db if isinstance(db, Session) else None
+        dataset_value = None
+        if isinstance(db, str):
+            dataset_value = db
+        elif dataset_id:
+            dataset_value = dataset_id
+
+        super().__init__(
+            source_name="Gaia DR3",
+            dataset_id=dataset_value,
+            db=db_session,
+            error_reporter=error_reporter,
+        )
         self.apply_parallax_correction = apply_parallax_correction
         
         if apply_parallax_correction:
@@ -377,6 +390,18 @@ class GaiaAdapter(BaseAdapter):
             Dictionary mapping Gaia columns to unified fields
         """
         return self.COLUMN_MAPPING.copy()
+
+    def get_catalog_type(self) -> str:
+        return "gaia"
+
+    def get_source_type(self) -> str:
+        return "Gaia DR3"
+
+    def get_license_info(self) -> Optional[str]:
+        return "ESA/Gaia DPAC"
+
+    def _get_raw_config(self) -> Optional[dict]:
+        return {"apply_parallax_correction": self.apply_parallax_correction}
 
 
 # Import timedelta for epoch conversion

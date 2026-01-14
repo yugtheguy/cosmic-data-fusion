@@ -17,6 +17,12 @@ All documentation files are organized in the `docs/` folder for easy reference.
   - Integration with API endpoints
   - Stage-by-stage breakdown (Stages 1-5)
 
+- **[SCHEMA_MAPPER.md](SCHEMA_MAPPER.md)** - Automatic column detection and mapping
+  - Header-based and sample-based detection
+  - API endpoints for preview and validation
+  - Integration with ingestion pipeline
+  - Complete usage examples
+
 ### Database & Infrastructure
 - **[DATABASE_SETUP_GUIDE.md](DATABASE_SETUP_GUIDE.md)** - Database upgrade strategy
   - Current SQLite setup
