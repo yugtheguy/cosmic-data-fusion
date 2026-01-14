@@ -90,3 +90,39 @@ def client(db_session: Session) -> TestClient:
         yield test_client
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def sample_stars(db_session):
+    """Create sample stars with varied properties for ML analysis."""
+    from app.models import UnifiedStarCatalog
+    
+    stars = []
+    
+    # Create 30 normal stars
+    for i in range(30):
+        stars.append(UnifiedStarCatalog(
+            original_source="Test",
+            source_id=f"ai_test_normal_{i}",
+            ra_deg=180.0 + i * 0.5,
+            dec_deg=45.0 + i * 0.3,
+            brightness_mag=12.0 + i * 0.1,
+            parallax_mas=5.0 + i * 0.2,
+            raw_frame="ICRS"
+        ))
+    
+    # Create 5 anomalous stars (very different properties)
+    for i in range(5):
+        stars.append(UnifiedStarCatalog(
+            original_source="Test",
+            source_id=f"ai_test_anomaly_{i}",
+            ra_deg=50.0 + i * 10,
+            dec_deg=-30.0 + i * 5,
+            brightness_mag=20.0 + i,
+            parallax_mas=50.0 + i * 10,
+            raw_frame="ICRS"
+        ))
+    
+    db_session.add_all(stars)
+    db_session.commit()
+    return stars
