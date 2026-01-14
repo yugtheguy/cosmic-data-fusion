@@ -38,6 +38,7 @@ from typing import Dict, List, Any, Optional, Union
 from io import StringIO
 
 import numpy as np
+from sqlalchemy.orm import Session
 
 from app.services.adapters.base_adapter import BaseAdapter, ValidationResult
 from app.services.utils.unit_converter import UnitConverter
@@ -109,20 +110,30 @@ class CSVAdapter(BaseAdapter):
     
     def __init__(
         self,
+        db: Optional[Session] = None,
+        error_reporter=None,
         dataset_id: Optional[str] = None,
         column_mapping: Optional[Dict[str, str]] = None,
-        delimiter: Optional[str] = None
+        delimiter: Optional[str] = None,
     ):
+        """Initialize CSV adapter.
+
+        Accepts either a dataset_id (legacy usage) or a SQLAlchemy Session as the
+        first positional argument (new usage from full-stack tests).
         """
-        Initialize CSV adapter.
-        
-        Args:
-            dataset_id: Optional dataset identifier for tracking
-            column_mapping: Optional custom column mapping for non-standard CSV files
-                          Format: {"ra": "custom_ra_column", "dec": "custom_dec_column", ...}
-            delimiter: Optional explicit delimiter (default: auto-detect)
-        """
-        super().__init__(source_name="CSV Catalog", dataset_id=dataset_id)
+        db_session = db if isinstance(db, Session) else None
+        dataset_value = None
+        if isinstance(db, str):
+            dataset_value = db
+        elif dataset_id:
+            dataset_value = dataset_id
+
+        super().__init__(
+            source_name="CSV Catalog",
+            dataset_id=dataset_value,
+            db=db_session,
+            error_reporter=error_reporter,
+        )
         self.column_mapping = column_mapping or {}
         self.delimiter = delimiter
         self.detected_columns = {}  # Will store auto-detected columns
@@ -602,3 +613,15 @@ class CSVAdapter(BaseAdapter):
             unified['raw_metadata'] = raw_metadata
         
         return unified
+    def get_catalog_type(self) -> str:
+        return "csv"
+
+    def get_source_type(self) -> str:
+        return "CSV"
+
+    def _get_raw_config(self) -> Optional[dict]:
+        return {
+            "column_mapping": self.column_mapping,
+            "delimiter": self.detected_delimiter,
+            "detected_columns": self.detected_columns,
+        }
