@@ -201,13 +201,17 @@
 /* Apply Filters Button */
 .apply-filters-btn {
     width: 100%;
-    padding: 0.625rem;
+    padding: 0.625rem 1rem;
     margin-top: 0.5rem;
     background: var(--accent-primary);
     border: none;
     border-radius: 6px;
     color: white;
     font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     font-size: 0.8rem;
     font-weight: 500;
     cursor: pointer;
@@ -300,6 +304,7 @@
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-color);
     z-index: 50;
+    box-sizing: border-box;
 }
 
 /* Search Bar */
@@ -1168,7 +1173,7 @@
 }
 
 .coord-value {
-    color: #4ade80;
+    color: #e8a87c;
     min-width: 80px;
 }
 

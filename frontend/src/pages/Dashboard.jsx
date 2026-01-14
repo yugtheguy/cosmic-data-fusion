@@ -294,13 +294,13 @@ function SkyMap({ stars, anomalies, isLoading }) {
     const [selectedRegion, setSelectedRegion] = useState(null);
     const navigate = useNavigate();
 
-    // Catalog color mapping
+    // Catalog color mapping (Orange shades)
     const catalogColors = {
-        'Gaia DR3': '#3b82f6', // Blue
-        'SDSS': '#8b5cf6',     // Purple
-        '2MASS': '#ef4444',    // Red
-        'Tycho-2': '#22c55e',  // Green
-        'Other': '#f59e0b'     // Amber
+        'Gaia DR3': '#d4683a', // Primary orange
+        'SDSS': '#e8a87c',     // Light orange
+        '2MASS': '#ef4444',    // Red (kept for contrast)
+        'Tycho-2': '#f59e0b',  // Amber
+        'Other': '#c2410c'     // Deep burnt orange
     };
 
     const getCatalogKey = (source) => {

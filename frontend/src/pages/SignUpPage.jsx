@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Rocket, Mail, Lock, Eye, EyeOff, ArrowRight, User, CheckCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 import './SignUpPage.css';
 
 // Cloud Overlay that fades out
@@ -31,7 +32,7 @@ function SignUpForm({ isVisible }) {
         e.preventDefault();
 
         if (password !== confirmPassword) {
-            alert("Passwords do not match!");
+            toast.error("Passwords do not match!");
             return;
         }
 
@@ -40,6 +41,7 @@ function SignUpForm({ isVisible }) {
         // Simulate signup
         setTimeout(() => {
             setIsLoading(false);
+            toast.success('Account created successfully!');
             // In a real app, you'd auto-login or redirect to login. 
             // Here, let's redirect to dashboard for seamless demo experience.
             navigate('/dashboard');

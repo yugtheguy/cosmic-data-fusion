@@ -311,9 +311,9 @@
 }
 
 .refresh-btn:hover {
-    background: rgba(59, 130, 246, 0.15);
-    border-color: rgba(59, 130, 246, 0.4);
-    color: #3b82f6;
+    background: rgba(212, 104, 58, 0.15);
+    border-color: rgba(212, 104, 58, 0.4);
+    color: #e8a87c;
 }
 
 /* Export Dropdown */

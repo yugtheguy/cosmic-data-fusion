@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import Plot from 'react-plotly.js';
 import { detectAnomalies, findClusters } from '../services/api';
+import toast from 'react-hot-toast';
 import './AILab.css';
 
 function AILab() {
@@ -74,8 +75,11 @@ function AILab() {
         try {
             const result = await findClusters(clusterParams.eps, clusterParams.minSamples);
             setClusterResult(result);
+            toast.success(`Found ${result.n_clusters} clusters`);
         } catch (err) {
-            setError(err.response?.data?.detail || 'Clustering failed');
+            const errorMsg = err.response?.data?.detail || 'Clustering failed';
+            setError(errorMsg);
+            toast.error(errorMsg);
         } finally {
             setLoading(false);
         }
@@ -88,8 +92,11 @@ function AILab() {
         try {
             const result = await detectAnomalies(contamination);
             setAnomalyResult(result);
+            toast.success(`Found ${result.anomaly_count} anomalies`);
         } catch (err) {
-            setError(err.response?.data?.detail || 'Anomaly detection failed');
+            const errorMsg = err.response?.data?.detail || 'Anomaly detection failed';
+            setError(errorMsg);
+            toast.error(errorMsg);
         } finally {
             setLoading(false);
         }

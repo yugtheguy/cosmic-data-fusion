@@ -31,6 +31,7 @@ import { getStarById, getNearbyStars, checkStarAnomaly, refreshStarFromGaia } fr
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import Star3D from '../components/Star3D';
+import toast from 'react-hot-toast';
 import './StarDetailPage.css';
 
 // Stat Card Component
@@ -400,8 +401,9 @@ function StarDetailPage() {
         } else if (format === 'clipboard') {
             try {
                 await navigator.clipboard.writeText(JSON.stringify(starData, null, 2));
-                alert('Star data copied to clipboard!');
+                toast.success('Star data copied to clipboard!');
             } catch (err) {
+                toast.error('Failed to copy to clipboard');
                 console.error('Failed to copy:', err);
             }
         }
@@ -421,10 +423,11 @@ function StarDetailPage() {
         try {
             const updatedStar = await refreshStarFromGaia(id);
             setStar(updatedStar);
+            toast.success('Star data refreshed from Gaia Archive');
             // Optionally refresh anomaly check with new data
             checkStarAnomaly(id).then(setAnomalyInfo).catch(console.warn);
         } catch (err) {
-            alert("Failed to fetch data from ESA Gaia Archive. Please try again.");
+            toast.error('Failed to fetch data from ESA Gaia Archive');
             console.error(err);
         } finally {
             setIsRefreshing(false);

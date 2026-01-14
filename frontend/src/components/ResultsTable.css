@@ -482,8 +482,8 @@
 }
 
 .magnitude-medium {
-    background: #a78bfa;
-    color: #a78bfa;
+    background: #e8a87c;
+    color: #e8a87c;
 }
 
 .magnitude-dim {
@@ -511,11 +511,11 @@
 }
 
 .source-gaia {
-    background: #3b82f6;
+    background: #d4683a;
 }
 
 .source-sdss {
-    background: #10b981;
+    background: #e8a87c;
 }
 
 .source-tess {
@@ -523,7 +523,7 @@
 }
 
 .source-fits {
-    background: #8b5cf6;
+    background: #c2410c;
 }
 
 /* Action cell */

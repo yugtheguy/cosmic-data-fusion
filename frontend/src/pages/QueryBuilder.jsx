@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import ResultsTable from '../components/ResultsTable';
 import { searchStars, boxSearch, coneSearch } from '../services/api';
+import toast from 'react-hot-toast';
 import './QueryBuilder.css';
 
 function QueryBuilder() {
@@ -82,7 +83,7 @@ function QueryBuilder() {
             let data;
             if (queryMode === 'cone') {
                 if (!filters.raCenter || !filters.decCenter) {
-                    alert('Please provide Center RA and Dec for Cone Search');
+                    toast.error('Please provide Center RA and Dec for Cone Search');
                     setIsLoading(false);
                     return;
                 }
@@ -94,7 +95,7 @@ function QueryBuilder() {
                 );
             } else if (queryMode === 'box') {
                 if (!filters.raMin || !filters.raMax || !filters.decMin || !filters.decMax) {
-                    alert('Please provide min/max RA and Dec for Box Search');
+                    toast.error('Please provide min/max RA and Dec for Box Search');
                     setIsLoading(false);
                     return;
                 }
@@ -140,11 +141,14 @@ function QueryBuilder() {
 
         } catch (err) {
             console.error('Query execution failed:', err);
-            // In a real app, show a toast notification
+            toast.error('Query execution failed. Check your parameters.');
         } finally {
             const endTime = performance.now();
             setExecutionTime(((endTime - startTime) / 1000).toFixed(2));
             setIsLoading(false);
+            if (results.length > 0) {
+                toast.success(`Found ${totalResults} objects`);
+            }
         }
     };
 

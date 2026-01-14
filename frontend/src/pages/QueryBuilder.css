@@ -3,9 +3,8 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: #050510;
-    /* Deep space black */
-    color: #e0e0e0;
+    background: #0f0f0f;
+    color: #e5e5e5;
     overflow: hidden;
 }
 
@@ -15,9 +14,9 @@
     align-items: center;
     justify-content: space-between;
     padding: 1rem 1.5rem;
-    background: rgba(10, 10, 18, 0.95);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(10px);
+    background: rgba(26, 26, 26, 0.6);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid #2a2a2a;
 }
 
 .header-content {
@@ -100,8 +99,8 @@
 }
 
 .stat-value.active {
-    color: #4ade80;
-    text-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+    color: #e8a87c;
+    text-shadow: 0 0 8px rgba(232, 168, 124, 0.4);
 }
 
 /* Main Layout */
@@ -115,8 +114,9 @@
 .query-controls-panel {
     width: 450px;
     min-width: 400px;
-    background: rgba(15, 15, 25, 0.95);
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(26, 26, 26, 0.6);
+    backdrop-filter: blur(12px);
+    border-right: 1px solid #2a2a2a;
     display: flex;
     flex-direction: column;
     z-index: 10;
@@ -127,6 +127,7 @@
     display: flex;
     background: rgba(0, 0, 0, 0.3);
     padding: 0.25rem;
+    border-bottom: 1px solid #2a2a2a;
 }
 
 .panel-tab {
@@ -366,8 +367,8 @@
 /* Panel Footer */
 .panel-footer {
     padding: 1.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid #2a2a2a;
+    background: rgba(26, 26, 26, 0.4);
 }
 
 .execute-btn {
@@ -405,8 +406,8 @@
     display: flex;
     flex-direction: column;
     background:
-        radial-gradient(circle at 50% 50%, rgba(20, 20, 40, 0.4) 0%, transparent 100%),
-        #050510;
+        radial-gradient(circle at 50% 50%, rgba(26, 26, 26, 0.4) 0%, transparent 100%),
+        #0f0f0f;
     position: relative;
 }
 
@@ -474,8 +475,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 1rem 2rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    background: rgba(10, 10, 15, 0.6);
+    border-bottom: 1px solid #2a2a2a;
+    background: rgba(26, 26, 26, 0.6);
 }
 
 .results-count {
@@ -500,7 +501,7 @@
 
 .execution-time {
     font-size: 0.8rem;
-    color: #4ade80;
+    color: #e8a87c;
 }
 
 .results-actions {
