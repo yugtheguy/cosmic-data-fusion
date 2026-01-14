@@ -100,33 +100,70 @@ class StarCatalogRepository:
         Search stars within a rectangular bounding box.
         
         Uses the composite (ra_deg, dec_deg) index for efficiency.
+        Automatically handles RA wrap-around at 0°/360° boundary.
         
         Args:
-            ra_min: Minimum RA in degrees
-            ra_max: Maximum RA in degrees
-            dec_min: Minimum Dec in degrees
-            dec_max: Maximum Dec in degrees
+            ra_min: Minimum RA in degrees (0-360)
+            ra_max: Maximum RA in degrees (0-360)
+            dec_min: Minimum Dec in degrees (-90 to 90)
+            dec_max: Maximum Dec in degrees (-90 to 90)
             limit: Maximum results to return
             
         Returns:
             List of matching stars
             
         Note:
-            Does NOT handle RA wrap-around at 0°/360° boundary.
-            For queries crossing RA=0°, split into two queries.
+            If ra_max < ra_min, assumes wraparound at RA=0°/360°.
+            Query is split into [ra_min, 360] ∪ [0, ra_max].
         """
-        query = self.db.query(UnifiedStarCatalog).filter(
-            UnifiedStarCatalog.ra_deg >= ra_min,
-            UnifiedStarCatalog.ra_deg <= ra_max,
-            UnifiedStarCatalog.dec_deg >= dec_min,
-            UnifiedStarCatalog.dec_deg <= dec_max
-        ).limit(limit)
+        # Check for RA wraparound (e.g., ra_min=350, ra_max=10)
+        if ra_max < ra_min:
+            logger.info(
+                f"Detected RA wraparound: ra_min={ra_min:.2f}°, ra_max={ra_max:.2f}°. "
+                f"Splitting into two queries."
+            )
+            
+            # Query 1: [ra_min, 360]
+            query1 = self.db.query(UnifiedStarCatalog).filter(
+                UnifiedStarCatalog.ra_deg >= ra_min,
+                UnifiedStarCatalog.ra_deg <= 360.0,
+                UnifiedStarCatalog.dec_deg >= dec_min,
+                UnifiedStarCatalog.dec_deg <= dec_max
+            ).limit(limit)
+            
+            # Query 2: [0, ra_max]
+            query2 = self.db.query(UnifiedStarCatalog).filter(
+                UnifiedStarCatalog.ra_deg >= 0.0,
+                UnifiedStarCatalog.ra_deg <= ra_max,
+                UnifiedStarCatalog.dec_deg >= dec_min,
+                UnifiedStarCatalog.dec_deg <= dec_max
+            ).limit(limit)
+            
+            results = query1.all() + query2.all()
+            
+            # Enforce limit on combined results
+            if len(results) > limit:
+                results = results[:limit]
+            
+            logger.debug(
+                f"RA wraparound search: [{ra_min:.2f}, 360] ∪ [0, {ra_max:.2f}], "
+                f"Dec[{dec_min:.2f}, {dec_max:.2f}] -> {len(results)} results"
+            )
+        else:
+            # Normal case: no wraparound
+            query = self.db.query(UnifiedStarCatalog).filter(
+                UnifiedStarCatalog.ra_deg >= ra_min,
+                UnifiedStarCatalog.ra_deg <= ra_max,
+                UnifiedStarCatalog.dec_deg >= dec_min,
+                UnifiedStarCatalog.dec_deg <= dec_max
+            ).limit(limit)
+            
+            results = query.all()
+            logger.debug(
+                f"Bounding box search: RA[{ra_min:.2f}, {ra_max:.2f}], "
+                f"Dec[{dec_min:.2f}, {dec_max:.2f}] -> {len(results)} results"
+            )
         
-        results = query.all()
-        logger.debug(
-            f"Bounding box search: RA[{ra_min:.2f}, {ra_max:.2f}], "
-            f"Dec[{dec_min:.2f}, {dec_max:.2f}] -> {len(results)} results"
-        )
         return results
     
     def search_bounding_box_for_cone(
