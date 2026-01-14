@@ -8,7 +8,7 @@ frame at J2000 epoch - the modern standard for astronomical catalogs.
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, Index, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime, Index, JSON, Text
 
 from app.database import Base
 
@@ -181,6 +181,8 @@ class DatasetMetadata(Base):
     # File information (if applicable)
     original_filename = Column(String(500), nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
+    file_hash = Column(String(64), nullable=True)  # SHA256 hash of original file
+    storage_key = Column(String(500), nullable=True)  # MinIO object key for file retrieval
     
     # Schema and configuration
     column_mappings = Column(JSON, nullable=True)  # {"original_ra": "ra_deg", "original_dec": "dec_deg", ...}
@@ -199,4 +201,83 @@ class DatasetMetadata(Base):
             f"<DatasetMetadata(id={self.id}, dataset_id='{self.dataset_id}', "
             f"source_name='{self.source_name}', catalog_type='{self.catalog_type}', "
             f"records={self.record_count})>"
+        )
+
+
+class IngestionError(Base):
+    """
+    Tracks all errors encountered during file validation and data ingestion.
+    
+    This model provides comprehensive error logging for the ingestion pipeline,
+    enabling debugging, user feedback, and data quality monitoring. Errors are
+    associated with dataset_id to allow tracking which errors occurred for which
+    datasets.
+    
+    Error Categories:
+        - VALIDATION: File validation failures (size, MIME, encoding)
+        - PARSING: Data parsing errors (malformed CSV, invalid FITS)
+        - MAPPING: Schema mapping failures (missing columns, wrong types)
+        - COORDINATE: Coordinate transformation errors (invalid coordinates)
+        - DATABASE: Database insertion errors (duplicates, constraints)
+        - NETWORK: Remote fetch failures (API timeouts, auth errors)
+    
+    Use Cases:
+        - Display errors to users during upload/ingestion
+        - Export error reports as CSV for debugging
+        - Monitor data quality across datasets
+        - Track error trends over time
+        - Filter out problematic records during batch processing
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        dataset_id: Foreign key to DatasetMetadata (null if dataset not created yet)
+        error_type: Category of error (VALIDATION, PARSING, MAPPING, etc.)
+        severity: Error severity (ERROR, WARNING, INFO)
+        message: Human-readable error message
+        details: JSON field for structured error details (file path, line number, etc.)
+        source_row: Row number in source file where error occurred (if applicable)
+        timestamp: UTC timestamp when error was logged
+    """
+    
+    __tablename__ = "ingestion_errors"
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # Foreign key to dataset
+    dataset_id = Column(String(36), nullable=True, index=True)
+    
+    # Error classification
+    error_type = Column(
+        String(50),
+        nullable=False,
+        index=True
+    )  # VALIDATION, PARSING, MAPPING, COORDINATE, DATABASE, NETWORK
+    
+    severity = Column(
+        String(20),
+        nullable=False,
+        default="ERROR"
+    )  # ERROR, WARNING, INFO
+    
+    # Error details
+    message = Column(Text, nullable=False)
+    details = Column(JSON, nullable=True)  # Structured error context
+    
+    # Source reference
+    source_row = Column(Integer, nullable=True)  # Row number in source file
+    
+    # Audit timestamp
+    timestamp = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        index=True
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<IngestionError(id={self.id}, dataset_id='{self.dataset_id}', "
+            f"type='{self.error_type}', severity='{self.severity}', "
+            f"message='{self.message[:50]}...')>"
         )

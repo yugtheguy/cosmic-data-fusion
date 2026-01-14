@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.database import init_db
-from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper
+from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors
 
 # Configure logging
 logging.basicConfig(
@@ -96,6 +96,7 @@ app.include_router(ai.router)  # AI Discovery endpoints (Phase 5)
 app.include_router(query.router)  # Query & Export endpoints (Phase 3)
 app.include_router(harmonize.router)  # Harmonization endpoints (Phase 2)
 app.include_router(schema_mapper.router)  # Schema Mapper endpoints
+app.include_router(errors.router)  # Error Reporting endpoints (Layer 1)
 app.include_router(health.router)
 
 
