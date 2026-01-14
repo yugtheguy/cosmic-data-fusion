@@ -19,7 +19,7 @@ import {
     ArrowLeft
 } from 'lucide-react';
 import ResultsTable from '../components/ResultsTable';
-import { searchStars, boxSearch, coneSearch } from '../services/api';
+import { searchStars, boxSearch, coneSearch, getHarmonizationStats } from '../services/api';
 import toast from 'react-hot-toast';
 import './QueryBuilder.css';
 
@@ -31,6 +31,7 @@ function QueryBuilder() {
     const [results, setResults] = useState([]);
     const [totalResults, setTotalResults] = useState(0);
     const [executionTime, setExecutionTime] = useState(0);
+    const [databaseStats, setDatabaseStats] = useState({ total_records: 0 });
 
     // Filter States
     const [filters, setFilters] = useState({
@@ -57,6 +58,19 @@ function QueryBuilder() {
         { id: 2, name: 'Nearby G-Type', date: '2026-01-12', count: 45 },
         { id: 3, name: 'Pleiades Cluster', date: '2026-01-13', count: 890 }
     ]);
+
+    // Fetch database stats on mount
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const stats = await getHarmonizationStats();
+                setDatabaseStats(stats);
+            } catch (err) {
+                console.error('Failed to fetch database stats:', err);
+            }
+        };
+        fetchStats();
+    }, []);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -178,7 +192,7 @@ function QueryBuilder() {
                     </div>
                     <div className="stat-item">
                         <span className="stat-label">Total Records</span>
-                        <span className="stat-value">2.4B</span>
+                        <span className="stat-value">{databaseStats.total_stars?.toLocaleString() || '—'}</span>
                     </div>
                 </div>
             </div>

@@ -258,20 +258,16 @@
 }
 
 .checkbox-label input:checked+.checkbox-custom {
-    background: #d4683a;
+    background: rgba(212, 104, 58, 0.25);
     border-color: #d4683a;
+    box-shadow: 0 0 12px rgba(212, 104, 58, 0.6),
+        0 0 20px rgba(212, 104, 58, 0.3),
+        inset 0 0 8px rgba(212, 104, 58, 0.4);
 }
 
-.checkbox-label input:checked+.checkbox-custom::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 5px;
-    width: 5px;
-    height: 9px;
-    border: solid white;
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
+.checkbox-label:hover .checkbox-custom {
+    border-color: rgba(212, 104, 58, 0.5);
+    box-shadow: 0 0 8px rgba(212, 104, 58, 0.2);
 }
 
 /* Inputs */
@@ -474,7 +470,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 2rem;
+    padding: 1.25rem 1.5rem;
     border-bottom: 1px solid #2a2a2a;
     background: rgba(26, 26, 26, 0.6);
 }
@@ -541,7 +537,7 @@
 .results-table-wrapper {
     flex: 1;
     overflow: hidden;
-    padding: 0;
+    padding: 1rem 1.5rem 1.5rem 1.5rem;
 }
 
 /* Saved Queries */

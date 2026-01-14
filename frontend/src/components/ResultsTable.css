@@ -255,6 +255,10 @@
     user-select: none;
 }
 
+.results-table th:first-child {
+    padding-left: 1.5rem;
+}
+
 .results-table th:hover {
     color: var(--text-primary, #e5e5e5);
     background: linear-gradient(180deg, rgba(212, 104, 58, 0.1) 0%, rgba(26, 26, 26, 0.98) 100%);
@@ -427,6 +431,10 @@
     white-space: nowrap;
     z-index: 1;
     transition: all 0.25s ease;
+}
+
+.results-table td:first-child {
+    padding-left: 1.5rem;
 }
 
 .results-table tbody tr:hover td {
