@@ -20,7 +20,12 @@ import {
     AlertCircle,
     TrendingUp,
     TrendingDown,
-    Activity
+    Activity,
+    Download,
+    ChevronDown,
+    FileJson,
+    FileText,
+    Clipboard
 } from 'lucide-react';
 import { getStarById, getNearbyStars, checkStarAnomaly, refreshStarFromGaia } from '../services/api';
 import { Canvas } from '@react-three/fiber';
@@ -47,7 +52,7 @@ function StatCard({ icon: Icon, label, value, unit, highlight = false }) {
 }
 
 // Coordinate Display with Copy
-function CoordinateDisplay({ label, value, precision = 6 }) {
+function CoordinateDisplay({ label, value, precision = 6, symbol }) {
     const [copied, setCopied] = useState(false);
     const formattedValue = value?.toFixed(precision) || '—';
 
@@ -63,11 +68,15 @@ function CoordinateDisplay({ label, value, precision = 6 }) {
 
     return (
         <div className="coord-display">
-            <span className="coord-label">{label}</span>
+            <div className="coord-header">
+                <span className="coord-symbol">{symbol}</span>
+                <span className="coord-label">{label}</span>
+            </div>
             <div className="coord-value-wrapper">
-                <span className="coord-value">{formattedValue}°</span>
+                <span className="coord-value">{formattedValue}</span>
+                <span className="coord-unit">°</span>
                 <button className="copy-btn" onClick={handleCopy} title="Copy to clipboard">
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? <Check size={16} /> : <Copy size={16} />}
                 </button>
             </div>
         </div>
@@ -345,7 +354,67 @@ function StarDetailPage() {
     const [isLoadingNearby, setIsLoadingNearby] = useState(true);
     const [isLoadingAnomaly, setIsLoadingAnomaly] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
     const [error, setError] = useState(null);
+
+    // Export star data
+    const handleExport = async (format) => {
+        setShowExportMenu(false);
+
+        if (!star) return;
+
+        const starData = {
+            source_id: star.source_id,
+            ra_deg: star.ra_deg,
+            dec_deg: star.dec_deg,
+            brightness_mag: star.brightness_mag,
+            parallax_mas: star.parallax_mas,
+            distance_pc: star.distance_pc,
+            original_source: star.original_source,
+            exported_at: new Date().toISOString()
+        };
+
+        if (format === 'json') {
+            const blob = new Blob([JSON.stringify(starData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `star_${star.source_id || star.id}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else if (format === 'csv') {
+            const headers = Object.keys(starData).join(',');
+            const values = Object.values(starData).join(',');
+            const csv = `${headers}\n${values}`;
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `star_${star.source_id || star.id}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else if (format === 'clipboard') {
+            try {
+                await navigator.clipboard.writeText(JSON.stringify(starData, null, 2));
+                alert('Star data copied to clipboard!');
+            } catch (err) {
+                console.error('Failed to copy:', err);
+            }
+        }
+    };
+
+    // Open in SIMBAD
+    const handleOpenSimbad = () => {
+        setShowExportMenu(false);
+        if (star?.ra_deg && star?.dec_deg) {
+            const simbadUrl = `https://simbad.u-strasbg.fr/simbad/sim-coo?Coord=${star.ra_deg}+${star.dec_deg}&CooFrame=ICRS&CooEpoch=2000&CooEqui=2000&Radius=2&Radius.unit=arcsec&submit=submit+query`;
+            window.open(simbadUrl, '_blank');
+        }
+    };
 
     const handleGaiaRefresh = async () => {
         setIsRefreshing(true);
@@ -452,20 +521,67 @@ function StarDetailPage() {
                     <span>Back</span>
                 </button>
 
-                <div className="header-title">
-                    <div className="star-icon-large">
-                        <Star size={24} fill="currentColor" />
+                <div className="header-center">
+                    <div className="header-icon-wrapper">
+                        <Star size={28} fill="currentColor" />
+                        <div className="icon-ring"></div>
                     </div>
-                    <div className="title-text">
-                        <h1>{star?.source_id}</h1>
-                        <span className="source-badge">{star?.original_source}</span>
+                    <div className="header-title-block">
+                        <div className="title-row">
+                            <h1>{star?.source_id}</h1>
+                        </div>
+                        <div className="subtitle-row">
+                            <span className="source-badge">{star?.original_source}</span>
+                            <span className="divider">•</span>
+                            <span className="catalog-info">Stellar Object</span>
+                        </div>
                     </div>
                 </div>
 
                 <div className="header-actions">
-                    <button className="action-btn" title="View in external catalog">
-                        <ExternalLink size={16} />
+                    <button
+                        className="action-btn refresh-btn"
+                        onClick={handleGaiaRefresh}
+                        disabled={isRefreshing}
+                        title="Refresh from Gaia Archive"
+                    >
+                        <RefreshCw size={16} className={isRefreshing ? 'spin' : ''} />
                     </button>
+
+                    {/* Export Dropdown */}
+                    <div className="export-dropdown-container">
+                        <button
+                            className="action-btn export-trigger"
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            title="Export star data"
+                        >
+                            <Download size={16} />
+                            <ChevronDown size={12} />
+                        </button>
+
+                        {showExportMenu && (
+                            <div className="export-dropdown-menu">
+                                <div className="export-menu-header">Export Star Data</div>
+                                <button onClick={() => handleExport('json')}>
+                                    <FileJson size={14} />
+                                    <span>Download JSON</span>
+                                </button>
+                                <button onClick={() => handleExport('csv')}>
+                                    <FileText size={14} />
+                                    <span>Download CSV</span>
+                                </button>
+                                <button onClick={() => handleExport('clipboard')}>
+                                    <Clipboard size={14} />
+                                    <span>Copy to Clipboard</span>
+                                </button>
+                                <div className="export-menu-divider"></div>
+                                <button onClick={() => handleOpenSimbad()}>
+                                    <ExternalLink size={14} />
+                                    <span>View on SIMBAD</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </header>
 
@@ -475,13 +591,24 @@ function StarDetailPage() {
                 <section className="hero-section">
                     <div className="hero-card coordinates-card">
                         <div className="card-header">
-                            <Compass size={18} />
+                            <Compass size={20} />
                             <h2>Celestial Coordinates</h2>
                             <span className="frame-badge">ICRS J2000</span>
                         </div>
                         <div className="coordinates-grid">
-                            <CoordinateDisplay label="Right Ascension (α)" value={star?.ra_deg} precision={6} />
-                            <CoordinateDisplay label="Declination (δ)" value={star?.dec_deg} precision={6} />
+                            <CoordinateDisplay
+                                label="Right Ascension"
+                                value={star?.ra_deg}
+                                precision={6}
+                                symbol="α"
+                            />
+                            <div className="coord-divider"></div>
+                            <CoordinateDisplay
+                                label="Declination"
+                                value={star?.dec_deg}
+                                precision={6}
+                                symbol="δ"
+                            />
                         </div>
                     </div>
 

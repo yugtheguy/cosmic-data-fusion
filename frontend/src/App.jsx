@@ -5,6 +5,8 @@ import SignUpPage from './pages/SignUpPage';
 import Dashboard from './pages/Dashboard';
 import StarDetailPage from './pages/StarDetailPage';
 
+import QueryBuilder from './pages/QueryBuilder';
+
 function App() {
     return (
         <Router>
@@ -13,6 +15,7 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/query" element={<QueryBuilder />} />
                 <Route path="/star/:id" element={<StarDetailPage />} />
             </Routes>
         </Router>

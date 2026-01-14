@@ -35,16 +35,20 @@ import {
 import SchemaMapper from '../components/SchemaMapper';
 import AILab from '../components/AILab';
 import Harmonizer from '../components/Harmonizer';
+import ResultsTable from '../components/ResultsTable';
 import './Dashboard.css';
 
 // Sidebar Navigation Component
 function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters, isLoading }) {
+    const navigate = useNavigate();
     const navItems = [
         { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+        { id: 'query', icon: Search, label: 'Query Builder' },
+        { id: 'results', icon: Database, label: 'Data Table' },
         { id: 'upload', icon: UploadCloud, label: 'Ingest Data' },
         { id: 'skymap', icon: Map, label: 'Sky Map' },
-        { id: 'anomaly', icon: Brain, label: 'AI Anomaly' },
-        { id: 'harmonize', icon: Link2, label: 'Harmonize' },
+        { id: 'anomaly', icon: Brain, label: 'AI Lab' },
+        { id: 'harmonize', icon: Link2, label: 'Harmonizer' },
         { id: 'export', icon: Download, label: 'Export' },
     ];
 
@@ -63,7 +67,13 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
                     <button
                         key={item.id}
                         className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                        onClick={() => setActiveTab(item.id)}
+                        onClick={() => {
+                            if (item.id === 'query') {
+                                navigate('/query');
+                            } else {
+                                setActiveTab(item.id);
+                            }
+                        }}
                     >
                         <item.icon size={18} strokeWidth={1.5} />
                         <span>{item.label}</span>
@@ -855,6 +865,16 @@ function Dashboard() {
                         <AlertTriangle size={18} />
                         <span>{error}</span>
                         <button onClick={() => window.location.reload()}>Retry</button>
+                    </div>
+                ) : activeTab === 'results' ? (
+                    <div style={{ padding: '1.5rem' }}>
+                        <ResultsTable
+                            data={stars}
+                            isLoading={isLoading}
+                            title="Stellar Catalog"
+                            highlightAnomalies={true}
+                            anomalyIds={anomalies.map(a => a.id)}
+                        />
                     </div>
                 ) : activeTab === 'upload' ? (
                     <UploadView setActiveTab={setActiveTab} />

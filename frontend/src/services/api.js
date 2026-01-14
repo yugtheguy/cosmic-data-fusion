@@ -23,38 +23,47 @@ export const checkHealth = async () => {
 // ============================================
 export const searchStars = async (params = {}) => {
     // POST /query/search - Advanced multi-filter search
-    const response = await api.post('/query/search', {
+    const body = {
         limit: params.limit || 1000,
         offset: params.offset || 0,
-        min_mag: params.min_mag,
-        max_mag: params.max_mag,
-        ra_min: params.ra_min,
-        ra_max: params.ra_max,
-        dec_min: params.dec_min,
-        dec_max: params.dec_max,
-    });
+    };
+
+    // Only add optional params if they have values
+    if (params.min_mag !== undefined) body.min_mag = params.min_mag;
+    if (params.max_mag !== undefined) body.max_mag = params.max_mag;
+    if (params.ra_min !== undefined) body.ra_min = params.ra_min;
+    if (params.ra_max !== undefined) body.ra_max = params.ra_max;
+    if (params.dec_min !== undefined) body.dec_min = params.dec_min;
+    if (params.dec_max !== undefined) body.dec_max = params.dec_max;
+    if (params.original_source) body.original_source = params.original_source;
+
+    const response = await api.post('/query/search', body);
     return response.data;
 };
 
 export const boxSearch = async (ra_min, ra_max, dec_min, dec_max, limit = 1000) => {
-    // POST /search/box - Bounding box search
-    const response = await api.post('/search/box', {
-        ra_min,
-        ra_max,
-        dec_min,
-        dec_max,
-        limit,
+    // GET /search/box - Bounding box search
+    const response = await api.get('/search/box', {
+        params: {
+            ra_min,
+            ra_max,
+            dec_min,
+            dec_max,
+            limit
+        }
     });
     return response.data;
 };
 
-export const coneSearch = async (ra_center, dec_center, radius_deg, limit = 1000) => {
-    // POST /search/cone - Cone search around a point
-    const response = await api.post('/search/cone', {
-        ra_center,
-        dec_center,
-        radius_deg,
-        limit,
+export const coneSearch = async (ra, dec, radius, limit = 1000) => {
+    // GET /search/cone - Cone search around a point
+    const response = await api.get('/search/cone', {
+        params: {
+            ra,
+            dec,
+            radius,
+            limit
+        }
     });
     return response.data;
 };
