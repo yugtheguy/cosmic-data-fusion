@@ -29,6 +29,7 @@ from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import Session
 
 from app.models import UnifiedStarCatalog
+from app.repository.discovery import DiscoveryRepository
 
 # Suppress joblib warning about physical cores (Windows-specific)
 warnings.filterwarnings("ignore", category=UserWarning, module="joblib")
@@ -255,7 +256,9 @@ class AIDiscoveryService:
     def detect_anomalies(
         self,
         contamination: float = 0.05,
-        random_state: int = 42
+        random_state: int = 42,
+        save_results: bool = False,
+        dataset_filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         Detect anomalous stars using Isolation Forest algorithm.
@@ -275,6 +278,8 @@ class AIDiscoveryService:
             contamination: Expected proportion of anomalies (0.0 to 0.5)
                           0.05 = expect ~5% of data to be anomalous
             random_state: Random seed for reproducibility
+            save_results: If True, persist results to discovery_runs and discovery_results tables
+            dataset_filter: Optional query filters applied before analysis (for provenance tracking)
             
         Returns:
             List of anomalous stars with their anomaly scores:
@@ -291,7 +296,7 @@ class AIDiscoveryService:
         Raises:
             InsufficientDataError: If data hasn't been loaded or is insufficient
         """
-        logger.info(f"Running anomaly detection with contamination={contamination}")
+        logger.info(f"Running anomaly detection with contamination={contamination}, save_results={save_results}")
         
         # Ensure data is loaded
         if self._scaled_features is None:
@@ -342,13 +347,27 @@ class AIDiscoveryService:
             f"out of {len(self._df)} stars ({100*len(anomalies)/len(self._df):.1f}%)"
         )
         
+        # Optionally save results to database
+        if save_results:
+            self._save_anomaly_results(
+                contamination=contamination,
+                random_state=random_state,
+                dataset_filter=dataset_filter,
+                total_stars=len(self._df),
+                anomalies=anomalies,
+                all_scores=scores,
+                all_labels=labels
+            )
+        
         return anomalies
     
     def detect_clusters(
         self,
         eps: float = 0.5,
         min_samples: int = 10,
-        use_position_and_magnitude: bool = True
+        use_position_and_magnitude: bool = True,
+        save_results: bool = False,
+        dataset_filter: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Detect star clusters using DBSCAN algorithm.
@@ -381,6 +400,8 @@ class AIDiscoveryService:
                         Higher = more robust clusters, fewer small clusters
             use_position_and_magnitude: If True, cluster on RA, Dec, and magnitude.
                                         If False, cluster on all features.
+            save_results: If True, persist results to discovery_runs and discovery_results tables
+            dataset_filter: Optional query filters applied before analysis (for provenance tracking)
         
         Returns:
             Dictionary with cluster information:
@@ -401,7 +422,7 @@ class AIDiscoveryService:
         Raises:
             InsufficientDataError: If data hasn't been loaded or is insufficient
         """
-        logger.info(f"Running DBSCAN clustering with eps={eps}, min_samples={min_samples}")
+        logger.info(f"Running DBSCAN clustering with eps={eps}, min_samples={min_samples}, save_results={save_results}")
         
         # Ensure data is loaded
         if self._scaled_features is None:
@@ -484,7 +505,7 @@ class AIDiscoveryService:
                 ],
             }
         
-        return {
+        result = {
             "n_clusters": n_clusters,
             "n_noise": n_noise,
             "total_stars": len(self._df),
@@ -496,6 +517,19 @@ class AIDiscoveryService:
             "clusters": clusters,
             "cluster_stats": cluster_stats,
         }
+        
+        # Optionally save results to database
+        if save_results:
+            self._save_cluster_results(
+                eps=eps,
+                min_samples=min_samples,
+                use_position_and_magnitude=use_position_and_magnitude,
+                dataset_filter=dataset_filter,
+                cluster_labels=cluster_labels,
+                result=result
+            )
+        
+        return result
     
     def get_summary_insights(self) -> Dict[str, Any]:
         """
@@ -563,3 +597,135 @@ class AIDiscoveryService:
                 f"Consider adjusting eps parameter if {clusters['n_clusters']} clusters seems too few/many.",
             ]
         }
+    
+    def _save_anomaly_results(
+        self,
+        contamination: float,
+        random_state: int,
+        dataset_filter: Optional[Dict[str, Any]],
+        total_stars: int,
+        anomalies: List[Dict[str, Any]],
+        all_scores: np.ndarray,
+        all_labels: np.ndarray
+    ) -> str:
+        """
+        Save anomaly detection results to database.
+        
+        Args:
+            contamination: Contamination parameter used
+            random_state: Random state used
+            dataset_filter: Query filters applied (if any)
+            total_stars: Total number of stars analyzed
+            anomalies: List of detected anomalies
+            all_scores: Anomaly scores for all stars
+            all_labels: Anomaly labels for all stars (-1 or 1)
+            
+        Returns:
+            run_id: UUID of the created discovery run
+        """
+        repo = DiscoveryRepository(self.db)
+        
+        # Create discovery run
+        run = repo.save_discovery_run(
+            run_type="anomaly",
+            parameters={
+                "contamination": contamination,
+                "random_state": random_state,
+                "algorithm": "IsolationForest",
+                "n_estimators": 100,
+                "features_used": self.FEATURE_COLUMNS
+            },
+            dataset_filter=dataset_filter,
+            total_stars=total_stars,
+            results_summary={
+                "n_anomalies": len(anomalies),
+                "anomaly_rate": len(anomalies) / total_stars if total_stars > 0 else 0,
+                "mean_anomaly_score": float(np.mean([a["anomaly_score"] for a in anomalies])) if anomalies else 0,
+                "min_anomaly_score": float(np.min([a["anomaly_score"] for a in anomalies])) if anomalies else 0
+            }
+        )
+        
+        # Save individual results for all stars
+        results = []
+        for i, star_id in enumerate(self._star_ids):
+            results.append({
+                "star_id": star_id,
+                "is_anomaly": 1 if all_labels[i] == -1 else 0,
+                "anomaly_score": float(all_scores[i]),
+                "cluster_id": None
+            })
+        
+        repo.save_discovery_results(run.run_id, results)
+        
+        # Mark run as complete and refresh materialized views
+        repo.mark_run_complete(run.run_id)
+        repo.refresh_discovery_run_stats()
+        repo.refresh_anomaly_overlap_matrix()  # Refresh overlap matrix when new anomaly run completes
+        
+        logger.info(f"Saved anomaly detection run {run.run_id} with {len(results)} results")
+        return run.run_id
+    
+    def _save_cluster_results(
+        self,
+        eps: float,
+        min_samples: int,
+        use_position_and_magnitude: bool,
+        dataset_filter: Optional[Dict[str, Any]],
+        cluster_labels: np.ndarray,
+        result: Dict[str, Any]
+    ) -> str:
+        """
+        Save clustering results to database.
+        
+        Args:
+            eps: Epsilon parameter used
+            min_samples: Min samples parameter used
+            use_position_and_magnitude: Whether only position+mag features were used
+            dataset_filter: Query filters applied (if any)
+            cluster_labels: Cluster labels for all stars
+            result: Full clustering result dictionary
+            
+        Returns:
+            run_id: UUID of the created discovery run
+        """
+        repo = DiscoveryRepository(self.db)
+        
+        # Create discovery run
+        run = repo.save_discovery_run(
+            run_type="cluster",
+            parameters={
+                "eps": eps,
+                "min_samples": min_samples,
+                "algorithm": "DBSCAN",
+                "metric": "euclidean",
+                "use_position_and_magnitude": use_position_and_magnitude,
+                "features_used": result["parameters"]["features_used"]
+            },
+            dataset_filter=dataset_filter,
+            total_stars=result["total_stars"],
+            results_summary={
+                "n_clusters": result["n_clusters"],
+                "n_noise": result["n_noise"],
+                "cluster_sizes": {name: stats["count"] for name, stats in result["cluster_stats"].items()}
+            }
+        )
+        
+        # Save individual results for all stars
+        results = []
+        for i, star_id in enumerate(self._star_ids):
+            results.append({
+                "star_id": star_id,
+                "is_anomaly": 0,  # Clustering doesn't mark anomalies
+                "anomaly_score": None,
+                "cluster_id": int(cluster_labels[i])  # -1 for noise, 0+ for clusters
+            })
+        
+        repo.save_discovery_results(run.run_id, results)
+        
+        # Mark run as complete and refresh materialized views
+        repo.mark_run_complete(run.run_id)
+        repo.refresh_discovery_run_stats()
+        repo.refresh_cluster_size_distribution()
+        
+        logger.info(f"Saved clustering run {run.run_id} with {len(results)} results")
+        return run.run_id

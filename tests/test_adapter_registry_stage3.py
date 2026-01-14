@@ -6,41 +6,14 @@ Tests /ingest/auto endpoint with various file types
 import pytest
 import io
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.main import app
-from app.database import Base, get_db
-
-# Create in-memory SQLite for testing with StaticPool
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create tables once
-Base.metadata.create_all(bind=engine)
-
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-app.dependency_overrides[get_db] = override_get_db
-
-client = TestClient(app)
 
 
 class TestAutoIngestFITS:
     """Test auto-ingestion of FITS files."""
     
-    def test_auto_ingest_fits_by_magic_bytes(self):
+    def test_auto_ingest_fits_by_magic_bytes(self, client):
         """Test auto-detection and ingestion of FITS file via magic bytes."""
         # Create minimal FITS file with magic bytes
         fits_header = b'SIMPLE  =                    T / file conforms to FITS standard             '
@@ -60,7 +33,7 @@ class TestAutoIngestFITS:
             assert data['adapter_confidence'] == 0.99
             assert data['detection_method'] == 'magic_bytes'
     
-    def test_auto_ingest_fits_by_extension(self):
+    def test_auto_ingest_fits_by_extension(self, client):
         """Test auto-detection of FITS file by .fits extension."""
         # CSV content with .fits extension
         csv_content = b'ra,dec,magnitude\n10.5,20.3,15.2\n'
@@ -80,7 +53,7 @@ class TestAutoIngestFITS:
 class TestAutoIngestCSV:
     """Test auto-ingestion of generic CSV files."""
     
-    def test_auto_ingest_csv_success(self):
+    def test_auto_ingest_csv_success(self, client):
         """Test successful auto-ingestion of generic CSV."""
         csv_content = (
             b'ra,dec,magnitude,source\n'
@@ -99,7 +72,7 @@ class TestAutoIngestCSV:
         assert data['records_ingested'] == 2
         assert 'Successfully ingested' in data['message']
     
-    def test_auto_ingest_csv_by_content(self):
+    def test_auto_ingest_csv_by_content(self, client):
         """Test CSV detection by content analysis (no extension)."""
         csv_content = b'ra,dec,magnitude\n10.5,20.3,15.2\n11.0,21.0,14.5\n'
         
@@ -116,7 +89,7 @@ class TestAutoIngestCSV:
 class TestAutoIngestGaia:
     """Test auto-ingestion of Gaia catalog files."""
     
-    def test_auto_ingest_gaia_by_columns(self):
+    def test_auto_ingest_gaia_by_columns(self, client):
         """Test Gaia detection by characteristic columns."""
         gaia_content = (
             b'source_id,ra,dec,parallax,pmra,pmdec,phot_g_mean_mag\n'
@@ -138,7 +111,7 @@ class TestAutoIngestGaia:
 class TestAutoIngestSDSS:
     """Test auto-ingestion of SDSS catalog files."""
     
-    def test_auto_ingest_sdss_by_columns(self):
+    def test_auto_ingest_sdss_by_columns(self, client):
         """Test SDSS detection by characteristic columns."""
         sdss_content = (
             b'objid,ra,dec,u,g,r,i,z,redshift,psfMag_g\n'
@@ -160,7 +133,7 @@ class TestAutoIngestSDSS:
 class TestAutoIngestErrors:
     """Test error handling in auto-ingestion."""
     
-    def test_auto_ingest_unrecognizable_file(self):
+    def test_auto_ingest_unrecognizable_file(self, client):
         """Test that unrecognizable file returns 400."""
         # Binary garbage that doesn't match any adapter
         garbage = b'\x00\x01\x02\x03\x04\x05\x06\x07'
@@ -172,7 +145,7 @@ class TestAutoIngestErrors:
         data = response.json()
         assert 'Could not detect file type' in data['detail']
     
-    def test_auto_ingest_invalid_csv_data(self):
+    def test_auto_ingest_invalid_csv_data(self, client):
         """Test that malformed CSV returns 400."""
         # CSV with invalid numeric data
         csv_content = b'ra,dec,magnitude\ninvalid,data,here\n'
@@ -185,7 +158,7 @@ class TestAutoIngestErrors:
         data = response.json()
         assert 'Failed to process' in data['detail'] or 'Invalid' in data['detail']
     
-    def test_auto_ingest_empty_file(self):
+    def test_auto_ingest_empty_file(self, client):
         """Test that empty file returns 400."""
         files = {'file': ('empty.csv', io.BytesIO(b''), 'text/csv')}
         response = client.post('/ingest/auto', files=files)
@@ -196,7 +169,7 @@ class TestAutoIngestErrors:
 class TestConfidenceThresholds:
     """Test confidence threshold behavior."""
     
-    def test_high_confidence_detection_wins(self):
+    def test_high_confidence_detection_wins(self, client):
         """Test that FITS magic bytes override ambiguous extension."""
         # FITS content with .csv extension - properly padded to 2880 bytes
         fits_header = b'SIMPLE  =                    T / file conforms to FITS standard             '

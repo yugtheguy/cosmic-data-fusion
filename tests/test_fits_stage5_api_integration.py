@@ -18,13 +18,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from fastapi.testclient import TestClient
-from app.main import app, init_db
-from app.database import SessionLocal, Base, engine
 from app.models import UnifiedStarCatalog
-
-# Initialize test client
-client = TestClient(app)
 
 # Test data path
 TEST_DATA_DIR = Path(__file__).parent.parent / "app" / "data"
@@ -33,17 +27,7 @@ TEST_DATA_DIR = Path(__file__).parent.parent / "app" / "data"
 class TestFITSAPIIntegration:
     """Test FITS API endpoints end-to-end"""
 
-    @classmethod
-    def setup_class(cls):
-        """Setup test database"""
-        print("\n" + "="*70)
-        print("STAGE 5 TEST: API Integration Setup")
-        print("="*70)
-        Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
-        print("[OK] Test database initialized")
-
-    def test_health_check(self):
+    def test_health_check(self, client):
         """Verify API is healthy"""
         print("\nSTAGE 5 TEST: Health Check")
         response = client.get("/health")
@@ -52,7 +36,7 @@ class TestFITSAPIIntegration:
         assert data["status"] == "healthy"
         print(f"[OK] API health check: {data}")
 
-    def test_fits_ingest_hipparcos(self):
+    def test_fits_ingest_hipparcos(self, client, db_session):
         """Test FITS ingestion via API - Hipparcos catalog"""
         print("\nSTAGE 5 TEST: Hipparcos FITS Ingestion via API")
         
@@ -81,11 +65,9 @@ class TestFITSAPIIntegration:
         assert "catalog_info" in result
         
         # Verify records in database
-        db = SessionLocal()
-        records = db.query(UnifiedStarCatalog).filter_by(
+        records = db_session.query(UnifiedStarCatalog).filter_by(
             dataset_id="api_hipparcos_test"
         ).all()
-        db.close()
         
         print(f"  [OK] {len(records)} records verified in database")
         assert len(records) == result["ingested_count"]
@@ -98,7 +80,7 @@ class TestFITSAPIIntegration:
         assert sample.dec_deg is not None
         assert sample.brightness_mag is not None
 
-    def test_fits_ingest_2mass(self):
+    def test_fits_ingest_2mass(self, client, db_session):
         """Test FITS ingestion via API - 2MASS catalog"""
         print("\nSTAGE 5 TEST: 2MASS FITS Ingestion via API")
         
@@ -124,16 +106,14 @@ class TestFITSAPIIntegration:
         dataset_id_2mass = result["dataset_id"]
         
         # Verify records in database
-        db = SessionLocal()
-        records = db.query(UnifiedStarCatalog).filter_by(
+        records = db_session.query(UnifiedStarCatalog).filter_by(
             dataset_id=dataset_id_2mass
         ).all()
-        db.close()
         
         print(f"  [OK] {len(records)} records verified in database")
         assert len(records) == result["ingested_count"]
 
-    def test_fits_ingest_multi_extension(self):
+    def test_fits_ingest_multi_extension(self, client):
         """Test FITS ingestion with extension selection"""
         print("\nSTAGE 5 TEST: Multi-Extension FITS Ingestion")
         
@@ -171,7 +151,7 @@ class TestFITSAPIIntegration:
         assert result["success"] == True
         print(f"  [OK] Extension 2 ingested {result['ingested_count']} records")
 
-    def test_fits_ingest_with_error_handling(self):
+    def test_fits_ingest_with_error_handling(self, client):
         """Test API error handling for invalid FITS"""
         print("\nSTAGE 5 TEST: Error Handling - Invalid FITS File")
         
@@ -190,18 +170,15 @@ class TestFITSAPIIntegration:
         print(f"  Error response: {json.dumps(error_data, indent=2)}")
         assert "detail" in error_data or "error" in error_data or "message" in error_data
 
-    def test_fits_dataset_isolation(self):
+    def test_fits_dataset_isolation(self, db_session):
         """Test that different datasets are properly isolated"""
         print("\nSTAGE 5 TEST: Dataset Isolation")
         
-        db = SessionLocal()
-        
         # Count records by unique dataset IDs (auto-generated)
-        all_records = db.query(UnifiedStarCatalog).all()
+        all_records = db_session.query(UnifiedStarCatalog).all()
         dataset_ids = set(r.dataset_id for r in all_records if r.dataset_id)
         
         total_count = len(all_records)
-        db.close()
         
         print(f"  Total records: {total_count}")
         print(f"  Unique datasets: {len(dataset_ids)}")
@@ -211,14 +188,12 @@ class TestFITSAPIIntegration:
         assert len(dataset_ids) > 0
         print(f"  [OK] Datasets properly isolated")
 
-    def test_query_across_datasets(self):
+    def test_query_across_datasets(self, db_session):
         """Test querying across different FITS datasets"""
         print("\nSTAGE 5 TEST: Cross-Dataset Query")
         
-        db = SessionLocal()
-        
         # Query all bright stars across all FITS datasets
-        bright_stars = db.query(UnifiedStarCatalog).filter(
+        bright_stars = db_session.query(UnifiedStarCatalog).filter(
             UnifiedStarCatalog.brightness_mag <= 8.0
         ).all()
         
@@ -230,17 +205,14 @@ class TestFITSAPIIntegration:
                   f"RA={sample.ra_deg:.2f}, Dec={sample.dec_deg:.2f}, "
                   f"Mag={sample.brightness_mag:.2f}")
         
-        db.close()
         assert len(bright_stars) >= 0
 
-    def test_spatial_query_api_data(self):
+    def test_spatial_query_api_data(self, db_session):
         """Test spatial queries on API-ingested data"""
         print("\nSTAGE 5 TEST: Spatial Queries on API Data")
         
-        db = SessionLocal()
-        
         # Find any test records from API ingestion
-        test_records = db.query(UnifiedStarCatalog).limit(5).all()
+        test_records = db_session.query(UnifiedStarCatalog).limit(5).all()
         
         if test_records:
             test_record = test_records[0]
@@ -249,17 +221,15 @@ class TestFITSAPIIntegration:
             
             # Spatial query (simple distance in degrees)
             radius = 10.0
-            nearby = db.query(UnifiedStarCatalog).filter(
+            nearby = db_session.query(UnifiedStarCatalog).filter(
                 (UnifiedStarCatalog.ra_deg - test_record.ra_deg)**2 +
                 (UnifiedStarCatalog.dec_deg - test_record.dec_deg)**2 <= radius**2
             ).all()
             
             print(f"  Stars within {radius} degree radius: {len(nearby)}")
             assert len(nearby) >= 1
-        
-        db.close()
 
-    def test_api_response_format(self):
+    def test_api_response_format(self, client):
         """Verify API response format matches specification"""
         print("\nSTAGE 5 TEST: API Response Format")
         
@@ -289,7 +259,7 @@ class TestFITSAPIIntegration:
         assert isinstance(result["failed_count"], int)
         assert isinstance(result["dataset_id"], str)
 
-    def test_performance_large_dataset(self):
+    def test_performance_large_dataset(self, client):
         """Test performance with full FITS file"""
         print("\nSTAGE 5 TEST: Performance - Large FITS File")
         
@@ -321,20 +291,11 @@ class TestFITSAPIIntegration:
 class TestAPIEndpoints:
     """Test other API endpoints with FITS data"""
 
-    @classmethod
-    def setup_class(cls):
-        """Setup for other endpoint tests"""
-        print("\n" + "="*70)
-        print("STAGE 5 TEST: Additional API Endpoints")
-        print("="*70)
-
-    def test_search_endpoint_with_fits_data(self):
+    def test_search_endpoint_with_fits_data(self, client, db_session):
         """Test search endpoint with FITS-ingested data"""
         print("\nSTAGE 5 TEST: Search Endpoint with FITS Data")
         
-        db = SessionLocal()
-        total_records = db.query(UnifiedStarCatalog).count()
-        db.close()
+        total_records = db_session.query(UnifiedStarCatalog).count()
         
         if total_records == 0:
             print("  [SKIP] Skipping - no FITS data in database")
@@ -351,13 +312,11 @@ class TestAPIEndpoints:
         result = response.json()
         print(f"  Found {len(result.get('results', []))} bright stars")
 
-    def test_harmonize_endpoint_with_fits(self):
+    def test_harmonize_endpoint_with_fits(self, client, db_session):
         """Test harmonize endpoint with FITS data"""
         print("\nSTAGE 5 TEST: Harmonize Endpoint with FITS Data")
         
-        db = SessionLocal()
-        first_dataset = db.query(UnifiedStarCatalog).first()
-        db.close()
+        first_dataset = db_session.query(UnifiedStarCatalog).first()
         
         if not first_dataset:
             print("  [SKIP] Skipping - no FITS data in database")

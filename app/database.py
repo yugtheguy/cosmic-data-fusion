@@ -1,11 +1,12 @@
 """
 Database configuration for COSMIC Data Fusion.
 
-SQLAlchemy setup with SQLite backend, designed with PostgreSQL-compatible patterns.
+Supports both SQLite (development/testing) and PostgreSQL+PostGIS (production).
 Uses modern SQLAlchemy 2.0 style with type hints.
 """
 
 import logging
+import os
 from typing import Generator
 
 from sqlalchemy import create_engine
@@ -14,16 +15,37 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 # Configure module logger
 logger = logging.getLogger(__name__)
 
-# SQLite database path
-# check_same_thread=False required for FastAPI's multi-threaded async handling
-# Safe because SQLAlchemy Session handles thread-safety internally
-DATABASE_URL = "sqlite:///./cosmic_data_fusion.db"
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    echo=False,  # Set True for SQL debugging
+# Database URL - read from environment or default to SQLite
+SQLALCHEMY_DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./cosmic_data_fusion.db"
 )
+
+# Determine database type
+is_sqlite = SQLALCHEMY_DATABASE_URL.startswith("sqlite")
+is_postgres = SQLALCHEMY_DATABASE_URL.startswith("postgresql")
+
+# Configure engine based on database type
+if is_sqlite:
+    # SQLite: check_same_thread=False for FastAPI compatibility
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        echo=False,  # Set True for SQL debugging
+    )
+    logger.info("Using SQLite database")
+elif is_postgres:
+    # PostgreSQL: Use connection pooling for production
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        pool_pre_ping=True,  # Verify connections before use
+        pool_size=10,        # Connection pool size
+        max_overflow=20,     # Max overflow connections
+        echo=False,          # Set True for SQL debugging
+    )
+    logger.info("Using PostgreSQL database with connection pooling")
+else:
+    raise ValueError(f"Unsupported database URL: {SQLALCHEMY_DATABASE_URL}")
 
 # Session factory
 # autocommit=False: Explicit transaction control
