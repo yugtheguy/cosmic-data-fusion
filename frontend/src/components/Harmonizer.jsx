@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Link2,
     GitMerge,
@@ -13,19 +14,19 @@ import {
     Eye,
     Atom
 } from 'lucide-react';
-import { runCrossMatch, getHarmonizationStats } from '../services/api';
+import { runCrossMatch, getHarmonizationStats, getFusionGroups, getFusionGroup } from '../services/api';
 import './Harmonizer.css';
 
 // Animated Network Visualization Component
-function FusionNetwork({ groups, stats, onSelectGroup }) {
+function FusionNetwork({ groups, onSelectGroup }) {
     const canvasRef = useRef(null);
     const [nodes, setNodes] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
     const animationRef = useRef(null);
 
-    // Generate nodes from stats
+    // Generate nodes from real groups
     useEffect(() => {
-        if (!stats) return;
+        if (!groups || groups.length === 0) return;
 
         const generatedNodes = [];
         const colors = {
@@ -35,72 +36,49 @@ function FusionNetwork({ groups, stats, onSelectGroup }) {
             'Fused': '#4A9F6E'
         };
 
-        // Create fusion group nodes
-        const groupCount = stats.unique_fusion_groups || 0;
-        const isolated = stats.isolated_stars || 0;
-        const fused = stats.stars_in_fusion_groups || 0;
-
         // Create central hub nodes for fusion groups
-        for (let i = 0; i < Math.min(groupCount, 20); i++) {
-            const angle = (i / Math.min(groupCount, 20)) * Math.PI * 2;
-            const radius = 120 + Math.random() * 40;
+        groups.forEach((group, i) => {
+            // Position hubs in a circle or random
+            const angle = (i / Math.min(groups.length, 50)) * Math.PI * 2;
+            const radius = 120 + Math.random() * 60;
+
             generatedNodes.push({
-                id: `fusion-${i}`,
-                x: 250 + Math.cos(angle) * radius,
-                y: 200 + Math.sin(angle) * radius,
+                id: group.id, // Real UUID
+                x: 250 + Math.cos(angle) * (radius * (0.8 + Math.random() * 0.4)),
+                y: 200 + Math.sin(angle) * (radius * (0.8 + Math.random() * 0.4)),
                 vx: 0,
                 vy: 0,
-                radius: 12 + Math.random() * 8,
+                radius: 8 + Math.min(group.star_count * 2, 8),
                 color: colors['Fused'],
                 type: 'fusion',
-                label: `Group ${i + 1}`,
-                stars: Math.floor(Math.random() * 5) + 2
+                label: group.label,
+                starCount: group.star_count,
+                data: group
             });
-        }
 
-        // Add orbiting satellite nodes (source observations)
-        generatedNodes.forEach((hub, idx) => {
-            if (hub.type === 'fusion') {
-                const satellites = hub.stars;
-                for (let j = 0; j < satellites; j++) {
-                    const sourceType = ['Gaia DR3', 'SDSS', 'Custom'][j % 3];
-                    const satAngle = (j / satellites) * Math.PI * 2 + Math.random() * 0.5;
-                    const satRadius = 25 + Math.random() * 15;
-                    generatedNodes.push({
-                        id: `sat-${idx}-${j}`,
-                        x: hub.x + Math.cos(satAngle) * satRadius,
-                        y: hub.y + Math.sin(satAngle) * satRadius,
-                        vx: (Math.random() - 0.5) * 0.5,
-                        vy: (Math.random() - 0.5) * 0.5,
-                        radius: 4 + Math.random() * 3,
-                        color: colors[sourceType] || colors['Custom'],
-                        type: 'source',
-                        parent: hub.id,
-                        label: sourceType
-                    });
-                }
+            // Add satellites for member stars (visual only)
+            const satellites = Math.min(group.star_count, 5); // Cap for viz
+            for (let j = 0; j < satellites; j++) {
+                const satAngle = (j / satellites) * Math.PI * 2 + Math.random() * 0.5;
+                const satRadius = 15 + Math.random() * 10;
+                generatedNodes.push({
+                    id: `${group.id}-sat-${j}`,
+                    x: 250 + Math.cos(angle) * radius + Math.cos(satAngle) * satRadius,
+                    y: 200 + Math.sin(angle) * radius + Math.sin(satAngle) * satRadius,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5,
+                    radius: 3 + Math.random() * 2,
+                    color: colors['Gaia DR3'], // Simplification
+                    type: 'source',
+                    parent: group.id
+                });
             }
         });
 
-        // Add some isolated nodes
-        for (let i = 0; i < Math.min(isolated, 15); i++) {
-            generatedNodes.push({
-                id: `isolated-${i}`,
-                x: 50 + Math.random() * 400,
-                y: 50 + Math.random() * 300,
-                vx: (Math.random() - 0.5) * 0.3,
-                vy: (Math.random() - 0.5) * 0.3,
-                radius: 3,
-                color: '#666',
-                type: 'isolated',
-                label: 'Isolated'
-            });
-        }
-
         setNodes(generatedNodes);
-    }, [stats]);
+    }, [groups]);
 
-    // Animation loop
+    // Animation loop (simplified for brevity, keeps existing physics)
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas || nodes.length === 0) return;
@@ -112,7 +90,7 @@ function FusionNetwork({ groups, stats, onSelectGroup }) {
         const animate = () => {
             ctx.clearRect(0, 0, width, height);
 
-            // Draw connections (edges)
+            // Draw connections
             ctx.strokeStyle = 'rgba(212, 104, 58, 0.2)';
             ctx.lineWidth = 1;
             nodes.forEach(node => {
@@ -129,53 +107,30 @@ function FusionNetwork({ groups, stats, onSelectGroup }) {
 
             // Update and draw nodes
             nodes.forEach(node => {
-                // Simple physics
                 if (node.type !== 'fusion') {
+                    // Physics for non-hub nodes
                     node.x += node.vx;
                     node.y += node.vy;
+                    if (node.x < 0 || node.x > width) node.vx *= -1;
+                    if (node.y < 0 || node.y > height) node.vy *= -1;
 
-                    // Bounce off walls
-                    if (node.x < node.radius || node.x > width - node.radius) node.vx *= -0.8;
-                    if (node.y < node.radius || node.y > height - node.radius) node.vy *= -0.8;
-
-                    // Keep within bounds
-                    node.x = Math.max(node.radius, Math.min(width - node.radius, node.x));
-                    node.y = Math.max(node.radius, Math.min(height - node.radius, node.y));
-
-                    // Attraction to parent
                     if (node.parent) {
                         const parent = nodes.find(n => n.id === node.parent);
                         if (parent) {
                             const dx = parent.x - node.x;
                             const dy = parent.y - node.y;
-                            const dist = Math.sqrt(dx * dx + dy * dy);
-                            if (dist > 40) {
-                                node.vx += dx * 0.001;
-                                node.vy += dy * 0.001;
-                            }
+                            node.vx += dx * 0.002;
+                            node.vy += dy * 0.002;
                         }
                     }
                 }
 
-                // Glow effect
-                if (node.type === 'fusion') {
-                    const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, node.radius * 2);
-                    gradient.addColorStop(0, node.color);
-                    gradient.addColorStop(0.5, node.color + '40');
-                    gradient.addColorStop(1, 'transparent');
-                    ctx.fillStyle = gradient;
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, node.radius * 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-                // Draw node
+                // Draw
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
                 ctx.fillStyle = node.color;
                 ctx.fill();
 
-                // Highlight selected
                 if (selectedNode === node.id) {
                     ctx.strokeStyle = '#fff';
                     ctx.lineWidth = 2;
@@ -185,17 +140,10 @@ function FusionNetwork({ groups, stats, onSelectGroup }) {
 
             animationRef.current = requestAnimationFrame(animate);
         };
-
         animate();
-
-        return () => {
-            if (animationRef.current) {
-                cancelAnimationFrame(animationRef.current);
-            }
-        };
+        return () => cancelAnimationFrame(animationRef.current);
     }, [nodes, selectedNode]);
 
-    // Handle click
     const handleClick = (e) => {
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
@@ -208,38 +156,18 @@ function FusionNetwork({ groups, stats, onSelectGroup }) {
             return Math.sqrt(dx * dx + dy * dy) < node.radius + 5;
         });
 
-        if (clicked) {
+        if (clicked && clicked.type === 'fusion') {
             setSelectedNode(clicked.id);
-            if (clicked.type === 'fusion' && onSelectGroup) {
-                onSelectGroup(clicked);
-            }
+            if (onSelectGroup) onSelectGroup(clicked.data);
         }
     };
 
     return (
         <div className="fusion-network">
-            <canvas
-                ref={canvasRef}
-                width={500}
-                height={400}
-                onClick={handleClick}
-            />
+            <canvas ref={canvasRef} width={500} height={400} onClick={handleClick} />
             <div className="network-legend">
-                <div className="legend-item">
-                    <span className="dot fused"></span> Fusion Group
-                </div>
-                <div className="legend-item">
-                    <span className="dot gaia"></span> Gaia DR3
-                </div>
-                <div className="legend-item">
-                    <span className="dot sdss"></span> SDSS
-                </div>
-                <div className="legend-item">
-                    <span className="dot custom"></span> Custom
-                </div>
-                <div className="legend-item">
-                    <span className="dot isolated"></span> Isolated
-                </div>
+                <div className="legend-item"><span className="dot fused"></span> Fusion Group</div>
+                <div className="legend-item"><span className="dot gaia"></span> Source Star</div>
             </div>
         </div>
     );
@@ -250,21 +178,65 @@ function Harmonizer() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [stats, setStats] = useState(null);
+    const [groups, setGroups] = useState([]); // Real groups list
     const [matchRadius, setMatchRadius] = useState(2.0);
     const [lastRun, setLastRun] = useState(null);
-    const [selectedGroup, setSelectedGroup] = useState(null);
 
-    // Load initial stats
+    // Selection state
+    const [selectedGroup, setSelectedGroup] = useState(null);
+    const [groupStars, setGroupStars] = useState([]);
+    const [loadingGroup, setLoadingGroup] = useState(false);
+
+    // Load initial stats & groups
     useEffect(() => {
-        loadStats();
+        const saved = sessionStorage.getItem('harmonizer_state');
+        let restored = false;
+
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed.stats) setStats(parsed.stats);
+                if (parsed.groups) setGroups(parsed.groups);
+                if (parsed.matchRadius) setMatchRadius(parsed.matchRadius);
+                if (parsed.lastRun) setLastRun(parsed.lastRun);
+                if (parsed.selectedGroup) setSelectedGroup(parsed.selectedGroup);
+                if (parsed.groupStars) setGroupStars(parsed.groupStars);
+                if (parsed.groups && parsed.groups.length > 0) {
+                    restored = true;
+                }
+            } catch (e) {
+                console.error('Failed to restore Harmonizer state', e);
+            }
+        }
+
+        if (!restored) {
+            loadData();
+        }
     }, []);
 
-    const loadStats = async () => {
+    // Persistence
+    useEffect(() => {
+        const state = {
+            stats,
+            groups,
+            matchRadius,
+            lastRun,
+            selectedGroup,
+            groupStars
+        };
+        sessionStorage.setItem('harmonizer_state', JSON.stringify(state));
+    }, [stats, groups, matchRadius, lastRun, selectedGroup, groupStars]);
+
+    const loadData = async () => {
         try {
-            const data = await getHarmonizationStats();
-            setStats(data);
+            const [statsData, groupsData] = await Promise.all([
+                getHarmonizationStats(),
+                getFusionGroups(50) // Load top 50 groups for viz
+            ]);
+            setStats(statsData);
+            setGroups(groupsData);
         } catch (err) {
-            console.error('Failed to load stats:', err);
+            console.error('Failed to load harmonization data:', err);
         }
     };
 
@@ -272,13 +244,26 @@ function Harmonizer() {
         setLoading(true);
         setError(null);
         try {
-            const result = await runCrossMatch(matchRadius);
+            const result = await runCrossMatch(matchRadius, true);
             setLastRun(result);
-            await loadStats(); // Refresh stats
+            await loadData(); // Refresh everything
         } catch (err) {
             setError(err.response?.data?.detail || 'Cross-match failed');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGroupSelect = async (group) => {
+        setSelectedGroup(group);
+        setLoadingGroup(true);
+        try {
+            const data = await getFusionGroup(group.id);
+            setGroupStars(data.stars || []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoadingGroup(false);
         }
     };
 
@@ -345,7 +330,7 @@ function Harmonizer() {
                         <div className="last-run-result">
                             <CheckCircle size={16} />
                             <span>
-                                Created {lastRun.groups_created} groups from {lastRun.total_stars} stars
+                                {lastRun.message}
                             </span>
                         </div>
                     )}
@@ -354,67 +339,83 @@ function Harmonizer() {
                 {/* Center: Network Visualization */}
                 <div className="visualization-panel glass-panel">
                     <h3><Link2 size={18} /> Fusion Network</h3>
-                    {stats ? (
+                    {groups.length > 0 ? (
                         <FusionNetwork
-                            stats={stats}
-                            onSelectGroup={setSelectedGroup}
+                            groups={groups}
+                            onSelectGroup={handleGroupSelect}
                         />
                     ) : (
                         <div className="empty-viz">
                             <Atom size={48} />
-                            <p>Run cross-match to visualize fusion groups</p>
+                            <p>Run cross-match to generate fusion groups</p>
                         </div>
                     )}
                 </div>
 
-                {/* Right: Stats */}
+                {/* Right: Stats & Inspector */}
                 <div className="stats-panel glass-panel">
-                    <h3><Star size={18} /> Fusion Statistics</h3>
+                    {selectedGroup ? (
+                        <div className="group-detail-view">
+                            <div className="detail-header">
+                                <h3><Eye size={18} /> {selectedGroup.label}</h3>
+                                <button className="close-detail" onClick={() => setSelectedGroup(null)}>×</button>
+                            </div>
 
-                    <div className="stat-grid">
-                        <div className="stat-box">
-                            <div className="stat-value">
-                                {stats?.total_stars?.toLocaleString() || '—'}
-                            </div>
-                            <div className="stat-label">Total Stars</div>
-                        </div>
-                        <div className="stat-box highlight">
-                            <div className="stat-value">
-                                {stats?.unique_fusion_groups?.toLocaleString() || '—'}
-                            </div>
-                            <div className="stat-label">Fusion Groups</div>
-                        </div>
-                        <div className="stat-box">
-                            <div className="stat-value">
-                                {stats?.stars_in_fusion_groups?.toLocaleString() || '—'}
-                            </div>
-                            <div className="stat-label">Fused Stars</div>
-                        </div>
-                        <div className="stat-box">
-                            <div className="stat-value">
-                                {stats?.isolated_stars?.toLocaleString() || '—'}
-                            </div>
-                            <div className="stat-label">Isolated</div>
-                        </div>
-                    </div>
-
-                    {/* Selected Group Inspector */}
-                    {selectedGroup && (
-                        <div className="group-inspector">
-                            <h4><Eye size={16} /> {selectedGroup.label}</h4>
-                            <div className="inspector-content">
-                                <div className="inspector-row">
-                                    <span>Stars in group:</span>
-                                    <span className="value">{selectedGroup.stars}</span>
+                            <div className="group-meta">
+                                <div className="meta-item">
+                                    <span className="label">Position</span>
+                                    <span className="value">RA {selectedGroup.ra?.toFixed(2)}°, Dec {selectedGroup.dec?.toFixed(2)}°</span>
                                 </div>
-                                <div className="inspector-row">
-                                    <span>Position:</span>
-                                    <span className="value">
-                                        ({selectedGroup.x?.toFixed(0)}, {selectedGroup.y?.toFixed(0)})
-                                    </span>
+                                <div className="meta-item">
+                                    <span className="label">Stars</span>
+                                    <span className="value">{selectedGroup.star_count}</span>
                                 </div>
                             </div>
+
+                            <div className="stars-list-wrapper">
+                                <h4>Member Stars</h4>
+                                {loadingGroup ? (
+                                    <div className="loading-list"><Loader2 className="spin" /> Loading...</div>
+                                ) : (
+                                    <div className="stars-list">
+                                        {groupStars.map(star => (
+                                            <Link key={star.id} to={`/star/${star.id}`} className="star-list-item">
+                                                <div className="star-icon"><Star size={14} /></div>
+                                                <div className="star-info">
+                                                    <span className="star-id">{star.source_id}</span>
+                                                    <span className="star-mag">Mag: {star.brightness_mag?.toFixed(2)}</span>
+                                                </div>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
+                    ) : (
+                        <>
+                            <h3><Star size={18} /> Fusion Statistics</h3>
+                            <div className="stat-grid">
+                                <div className="stat-box">
+                                    <div className="stat-value">{stats?.total_stars?.toLocaleString() || '—'}</div>
+                                    <div className="stat-label">Total Stars</div>
+                                </div>
+                                <div className="stat-box highlight">
+                                    <div className="stat-value">{stats?.unique_fusion_groups?.toLocaleString() || '—'}</div>
+                                    <div className="stat-label">Fusion Groups</div>
+                                </div>
+                                <div className="stat-box">
+                                    <div className="stat-value">{stats?.stars_in_fusion_groups?.toLocaleString() || '—'}</div>
+                                    <div className="stat-label">Fused Stars</div>
+                                </div>
+                                <div className="stat-box">
+                                    <div className="stat-value">{stats?.isolated_stars?.toLocaleString() || '—'}</div>
+                                    <div className="stat-label">Isolated</div>
+                                </div>
+                            </div>
+                            <div className="select-hint">
+                                <p>Select a group node in the visualization to view its member stars.</p>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

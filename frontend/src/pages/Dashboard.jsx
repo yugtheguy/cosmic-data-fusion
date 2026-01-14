@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Plot from 'react-plotly.js';
 import {
     LayoutDashboard,
@@ -660,22 +660,42 @@ function UploadView({ setActiveTab }) {
 
 // Main Dashboard Component
 function Dashboard() {
-    const [activeTab, setActiveTab] = useState('overview');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+
+    // Initialize state from URL or defaults
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
+
+    // Filter state initialized from URL
+    const [filters, setFilters] = useState({
+        ra_min: Number(searchParams.get('ra_min')) || 0,
+        ra_max: Number(searchParams.get('ra_max')) || 360,
+        dec_min: Number(searchParams.get('dec_min')) || -90,
+        dec_max: Number(searchParams.get('dec_max')) || 90,
+        max_mag: Number(searchParams.get('max_mag')) || 20
+    });
+
     const [stars, setStars] = useState([]);
     const [anomalies, setAnomalies] = useState([]);
     const [stats, setStats] = useState({});
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const navigate = useNavigate();
 
-    // Filter state
-    const [filters, setFilters] = useState({
-        ra_min: 0,
-        ra_max: 360,
-        dec_min: -90,
-        dec_max: 90,
-        max_mag: 20
-    });
+    // Sync state changes to URL
+    useEffect(() => {
+        const params = {};
+        if (activeTab) params.tab = activeTab;
+
+        // Add filters only if non-default (optional, but cleaner URL)
+        // For now, simple sync
+        params.ra_min = filters.ra_min;
+        params.ra_max = filters.ra_max;
+        params.dec_min = filters.dec_min;
+        params.dec_max = filters.dec_max;
+        params.max_mag = filters.max_mag;
+
+        setSearchParams(params, { replace: true });
+    }, [activeTab, filters, setSearchParams]);
 
     // Unified fetch logic
     const fetchStarsData = useCallback(async () => {
@@ -710,13 +730,14 @@ function Dashboard() {
 
     // Reset filters to defaults
     const handleResetFilters = () => {
-        setFilters({
+        const defaults = {
             ra_min: 0,
             ra_max: 360,
             dec_min: -90,
             dec_max: 90,
             max_mag: 20
-        });
+        };
+        setFilters(defaults);
         // The useEffect will pick up the change and auto-fetch
     };
 

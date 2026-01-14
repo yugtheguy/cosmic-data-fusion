@@ -16,6 +16,7 @@ import pandas as pd
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.models import UnifiedStarCatalog
 
@@ -190,17 +191,20 @@ class CrossMatchService:
         
         isolated_stars = total_stars - stars_in_groups
         
+        total_groups = len(multi_star_groups)
+        
         result = {
             "total_stars": total_stars,
             "groups_created": groups_created,
+            "total_groups": total_groups,
             "stars_in_groups": stars_in_groups,
             "isolated_stars": isolated_stars,
             "radius_arcsec": radius_arcsec,
-            "message": f"Cross-match complete. Created {groups_created} fusion groups."
+            "message": f"Cross-match complete. Found {total_groups} fusion groups ({groups_created} new)."
         }
         
         logger.info(
-            f"Cross-match complete: {groups_created} groups, "
+            f"Cross-match complete: {total_groups} groups total, {groups_created} new, "
             f"{stars_in_groups} stars grouped, {isolated_stars} isolated"
         )
         
@@ -260,3 +264,30 @@ class CrossMatchService:
             "isolated_stars": total_stars - stars_with_groups,
             "unique_fusion_groups": unique_groups or 0
         }
+    def list_fusion_groups(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        List fusion groups with metadata for visualization.
+        """
+        groups = self.db.query(
+            UnifiedStarCatalog.fusion_group_id,
+            func.count(UnifiedStarCatalog.id).label('star_count'),
+            func.avg(UnifiedStarCatalog.ra_deg).label('avg_ra'),
+            func.avg(UnifiedStarCatalog.dec_deg).label('avg_dec')
+        ).filter(
+            UnifiedStarCatalog.fusion_group_id.isnot(None)
+        ).group_by(
+            UnifiedStarCatalog.fusion_group_id
+        ).limit(limit).all()
+        
+        return [
+            {
+                "id": g.fusion_group_id,
+                "label": f"Group {i+1}",
+                "star_count": g.star_count,
+                "ra": float(g.avg_ra) if g.avg_ra else 0,
+                "dec": float(g.avg_dec) if g.avg_dec else 0,
+                # Simulate sources for visualization variety if strict mapping not needed yet
+                # ideally we count source types from DB but that's expensive
+            }
+            for i, g in enumerate(groups)
+        ]

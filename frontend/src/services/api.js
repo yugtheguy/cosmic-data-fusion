@@ -109,15 +109,27 @@ export const getHarmonizationStats = async () => {
     return response.data;
 };
 
-export const runCrossMatch = async (radius_arcsec = 2.0) => {
+export const runCrossMatch = async (radius_arcsec = 2.0, reset_existing = false) => {
     // POST /harmonize/cross-match - Run cross-matching
-    const response = await api.post('/harmonize/cross-match', { radius_arcsec });
+    const response = await api.post('/harmonize/cross-match', { radius_arcsec, reset_existing });
     return response.data;
 };
 
 export const validateCoordinates = async () => {
     // POST /harmonize/validate - Validate coordinate consistency
     const response = await api.post('/harmonize/validate');
+    return response.data;
+};
+
+export const getFusionGroup = async (groupId) => {
+    // GET /harmonize/fusion-group/{group_id} - Get stars in a fusion group
+    const response = await api.get(`/harmonize/fusion-group/${groupId}`);
+    return response.data;
+};
+
+export const getFusionGroups = async (limit = 100) => {
+    // GET /harmonize/groups - List fusion groups
+    const response = await api.get('/harmonize/groups', { params: { limit } });
     return response.data;
 };
 

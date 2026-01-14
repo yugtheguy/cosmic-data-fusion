@@ -430,9 +430,9 @@ function StarDetailPage() {
                     <AlertTriangle size={48} />
                     <h2>Oops!</h2>
                     <p>{error}</p>
-                    <button onClick={() => navigate('/dashboard')}>
+                    <button onClick={() => navigate(-1)}>
                         <ArrowLeft size={16} />
-                        Back to Dashboard
+                        Back to Previous Page
                     </button>
                 </div>
             </div>
@@ -447,7 +447,7 @@ function StarDetailPage() {
 
             {/* Header */}
             <header className="star-detail-header">
-                <button className="back-button" onClick={() => navigate('/dashboard')}>
+                <button className="back-button" onClick={() => navigate(-1)}>
                     <ArrowLeft size={18} />
                     <span>Back</span>
                 </button>

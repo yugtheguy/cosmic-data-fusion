@@ -36,6 +36,36 @@ function AILab() {
     const [contamination, setContamination] = useState(0.05);
     const [anomalyResult, setAnomalyResult] = useState(null);
 
+    // Persistence logic
+    useEffect(() => {
+        const saved = sessionStorage.getItem('ailab_state');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed.activeTab) setActiveTab(parsed.activeTab);
+                if (parsed.clusterParams) setClusterParams(parsed.clusterParams);
+                if (parsed.clusterResult) setClusterResult(parsed.clusterResult);
+                if (parsed.expandedCluster) setExpandedCluster(parsed.expandedCluster);
+                if (parsed.contamination) setContamination(parsed.contamination);
+                if (parsed.anomalyResult) setAnomalyResult(parsed.anomalyResult);
+            } catch (e) {
+                console.error('Failed to restore AILab state', e);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        const state = {
+            activeTab,
+            clusterParams,
+            clusterResult,
+            expandedCluster,
+            contamination,
+            anomalyResult
+        };
+        sessionStorage.setItem('ailab_state', JSON.stringify(state));
+    }, [activeTab, clusterParams, clusterResult, expandedCluster, contamination, anomalyResult]);
+
     // Run clustering
     const runClustering = async () => {
         setLoading(true);
