@@ -83,6 +83,7 @@ def init_db() -> None:
     """
     # Import models to register them with Base.metadata
     from app import models  # noqa: F401
+    from app import models_exoplanet  # Planet Hunter module
     
     Base.metadata.create_all(bind=engine)
-    logger.info("Database tables initialized successfully")
+    logger.info("Database tables initialized successfully (including exoplanet_candidates)")
