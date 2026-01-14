@@ -119,6 +119,100 @@ def load_gaia_dataset(
         )
 
 
+@router.post(
+    "/sdss/load",
+    response_model=GaiaLoadResponse,  # Reuse same response model
+    summary="Load SDSS DR18 sample data",
+    description="""
+Load the bundled SDSS DR18 sample dataset into the database.
+
+This endpoint reads a pre-bundled CSV from the SDSS DR18 catalog
+and ingests stellar objects into the unified star catalog.
+
+**Data Source**: SDSS DR18  
+**License**: Data provided under SDSS Data Release terms  
+**Coordinates**: ICRS (no transformation needed)
+
+**Behavior**:
+- By default, only loads STAR class objects (not galaxies or QSOs)
+- Skips stars already in the database (by source_id)
+- Uses r-band magnitude as brightness measure
+- Uses bulk insert for performance
+- Returns ingestion statistics
+    """
+)
+def load_sdss_dataset(
+    skip_duplicates: bool = True,
+    max_rows: int | None = None,
+    stars_only: bool = True,
+    db: Session = Depends(get_db)
+) -> GaiaLoadResponse:
+    """
+    Load bundled SDSS DR18 sample data into the database.
+    
+    Args:
+        skip_duplicates: Skip stars already in DB (default: True)
+        max_rows: Maximum rows to load (None = all)
+        stars_only: Only load STAR class objects (default: True)
+        db: Database session (injected)
+        
+    Returns:
+        GaiaLoadResponse with ingestion statistics
+        
+    Raises:
+        HTTPException 500: If ingestion fails
+    """
+    from app.services.sdss_ingestion import SDSSIngestionService
+    
+    try:
+        logger.info(
+            f"SDSS load request: skip_duplicates={skip_duplicates}, "
+            f"max_rows={max_rows}, stars_only={stars_only}"
+        )
+        
+        service = SDSSIngestionService(db)
+        ingested, skipped, errors = service.load_bundled_sdss_data(
+            skip_duplicates=skip_duplicates,
+            max_rows=max_rows,
+            stars_only=stars_only
+        )
+        
+        # Determine success status
+        success = ingested > 0 or (ingested == 0 and skipped > 0)
+        
+        if ingested > 0:
+            message = f"Successfully loaded {ingested} SDSS DR18 stars"
+        elif skipped > 0:
+            message = f"No new stars to load ({skipped} already in database)"
+        else:
+            message = "No stars were loaded"
+        
+        return GaiaLoadResponse(
+            success=success,
+            message=message,
+            ingested_count=ingested,
+            skipped_count=skipped,
+            error_count=errors,
+            source="SDSS DR18",
+            license_note="Data provided under SDSS Data Release terms"
+        )
+        
+    except CSVIngestionError as e:
+        logger.error(f"CSV ingestion error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to read SDSS data file: {str(e)}"
+        )
+    
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during SDSS ingestion: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+
+
 @router.get(
     "/gaia/stats",
     response_model=DatasetStatsResponse,
