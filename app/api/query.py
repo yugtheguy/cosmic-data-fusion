@@ -317,8 +317,8 @@ async def export_data(
         exporter = DataExporter(results)
         
         # Generate timestamp for filename
-        from datetime import datetime
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        from datetime import datetime, timezone
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         
         # Export based on format
         if format == ExportFormat.CSV:
