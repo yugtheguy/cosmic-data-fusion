@@ -619,17 +619,38 @@
 }
 
 .anomaly-item {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 1rem;
     padding: 0.875rem 1.25rem;
-    border-bottom: 1px solid var(--border-color);
-    transition: background 0.2s ease;
-    animation: slideIn 0.3s ease forwards;
+    border-bottom: 1px solid rgba(42, 42, 42, 0.5);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: rowSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     opacity: 0;
+    cursor: pointer;
 }
 
-@keyframes slideIn {
+/* Zebra striping with texture */
+.anomaly-item:nth-child(odd) {
+    background:
+        repeating-linear-gradient(90deg,
+            transparent,
+            transparent 4px,
+            rgba(255, 255, 255, 0.005) 4px,
+            rgba(255, 255, 255, 0.005) 8px);
+}
+
+.anomaly-item:nth-child(even) {
+    background:
+        repeating-linear-gradient(90deg,
+            rgba(212, 104, 58, 0.015),
+            rgba(212, 104, 58, 0.015) 4px,
+            transparent 4px,
+            transparent 8px);
+}
+
+@keyframes rowSlideIn {
     from {
         opacity: 0;
         transform: translateX(-10px);
@@ -641,12 +662,52 @@
     }
 }
 
+/* Hover gradient sweep */
+.anomaly-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg,
+            rgba(212, 104, 58, 0.15) 0%,
+            rgba(212, 104, 58, 0.05) 50%,
+            transparent 100%);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.anomaly-item:hover::before {
+    width: 100%;
+}
+
+/* Active indicator line */
+.anomaly-item::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 3px;
+    height: 60%;
+    background: var(--accent-primary, #d4683a);
+    border-radius: 0 3px 3px 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(212, 104, 58, 0.5);
+}
+
+.anomaly-item:hover::after {
+    transform: translateY(-50%) scaleY(1);
+}
+
 .anomaly-item:last-child {
     border-bottom: none;
 }
 
 .anomaly-item:hover {
-    background: rgba(212, 104, 58, 0.05);
+    background: rgba(212, 104, 58, 0.03);
 }
 
 .anomaly-indicator {
@@ -1109,7 +1170,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: linear-gradient(135deg, rgba(30, 18, 12, 0.95) 0%, rgba(45, 28, 18, 0.9) 100%);
+    background: linear-gradient(135deg, rgba(8, 12, 20, 0.95) 0%, rgba(15, 20, 35, 0.9) 100%);
     border-radius: 12px;
     overflow: hidden;
 }
