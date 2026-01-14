@@ -1,3 +1,54 @@
+## PostgreSQL / PostGIS (Windows)
+
+This project can run against a PostgreSQL database with PostGIS enabled. You can either run PostgreSQL/PostGIS in Docker or install PostgreSQL natively on Windows.
+
+### Enabling PostGIS via Alembic
+
+An Alembic migration that enables PostGIS is included:
+
+- `alembic/versions/0001_enable_postgis.py` — runs `CREATE EXTENSION IF NOT EXISTS postgis;`
+
+To apply migrations once a PostgreSQL instance is available, set your `DATABASE_URL` environment variable and run:
+
+```powershell
+setx DATABASE_URL "postgresql+psycopg2://postgres:password@localhost:5432/cosmic"
+python -m alembic upgrade head
+```
+
+Replace the connection string values above for your setup (`user`, `password`, `host`, `port`, `database`).
+
+### Windows native install (PostgreSQL + PostGIS)
+
+If you have a PostgreSQL installer on your machine (e.g. the one shown in the project screenshot), run the installer and then install PostGIS via StackBuilder or by running the `CREATE EXTENSION postgis;` SQL command in `psql` or a DB client connected as a superuser.
+
+PowerShell command to run the included PostgreSQL installer (run as Administrator):
+
+```powershell
+# Run installer (replace path if different)
+Start-Process -FilePath "C:\Program Files\PostgreSQL\postgresql_18\installer.exe" -Verb RunAs
+```
+
+After installation, create a database and enable PostGIS:
+
+```sql
+-- connect as superuser
+CREATE DATABASE cosmic;
+\c cosmic
+CREATE EXTENSION IF NOT EXISTS postgis;
+```
+
+### Docker (recommended if Docker is available)
+
+If Docker Desktop can run on your machine, start the `postgres` service from `docker-compose.yml` and then apply migrations:
+
+```powershell
+# from repo root
+docker-compose up -d postgres
+# set DATABASE_URL to point to the container and then
+python -m alembic upgrade head
+```
+
+If Docker Desktop is not currently running, you can either enable WSL2/Hyper-V or use the native installer.
 # 🗄️ Database Setup Guide: PostgreSQL, PostGIS & Redis
 
 **Current Status:** Using SQLite (local development)  

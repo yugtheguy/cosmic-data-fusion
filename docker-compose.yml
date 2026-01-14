@@ -1,25 +1,25 @@
 version: '3.9'
 
 services:
-  # SQLite (Development)
-  # Note: Remove this for PostgreSQL in production
-  
-  # PostgreSQL Database (Optional - for production)
-  # postgres:
-  #   image: postgis/postgis:15-3.3
-  #   environment:
-  #     POSTGRES_DB: cosmic_data
-  #     POSTGRES_USER: cosmic_user
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U cosmic_user"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # PostgreSQL Database with PostGIS
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: cosmic-postgis
+    environment:
+      POSTGRES_DB: cosmic_data
+      POSTGRES_USER: cosmic_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cosmic_secure_pass}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cosmic_user -d cosmic_data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   # Redis Cache (Optional)
   # redis:
@@ -39,14 +39,8 @@ services:
       dockerfile: Dockerfile
     container_name: cosmic-data-fusion-app
     environment:
-      # SQLite (default)
-      DATABASE_URL: sqlite:///./cosmic_data.db
-      
-      # PostgreSQL (uncomment for production)
-      # DATABASE_URL: postgresql://cosmic_user:${POSTGRES_PASSWORD:-secure_password}@postgres:5432/cosmic_data
-      
-      # Redis (uncomment if using)
-      # REDIS_URL: redis://redis:6379/0
+      # Database URL - now points to Postgres
+      DATABASE_URL: postgresql://cosmic_user:${POSTGRES_PASSWORD:-cosmic_secure_pass}@postgres:5432/cosmic_data
       
       APP_ENV: ${APP_ENV:-development}
       DEBUG: ${DEBUG:-False}
@@ -55,12 +49,9 @@ services:
     volumes:
       - ./app:/app/app
       - ./cosmic_data.db:/app/cosmic_data.db
-    # Uncomment dependencies if using PostgreSQL/Redis
-    # depends_on:
-    #   postgres:
-    #     condition: service_healthy
-    #   redis:
-    #     condition: service_healthy
+    depends_on:
+      postgres:
+        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # Development utilities (optional)

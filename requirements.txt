@@ -7,6 +7,9 @@ uvicorn[standard]>=0.27.0
 
 # Database ORM
 sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+alembic>=1.13.1
+geoalchemy2>=0.14.1
 
 # Data Validation
 pydantic>=2.5.0
