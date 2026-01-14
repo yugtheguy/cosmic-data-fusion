@@ -83,6 +83,35 @@ def real_sdss_csv_file():
         os.unlink(temp_path)
 
 
+@pytest.fixture
+def real_fits_file():
+    """Use actual Hipparcos FITS file from app/data."""
+    fits_path = Path(__file__).parent.parent / "app" / "data" / "hipparcos_sample.fits"
+    if not fits_path.exists():
+        pytest.skip(f"FITS file not found: {fits_path}")
+    return str(fits_path)
+
+
+@pytest.fixture
+def real_generic_csv_file():
+    """Create a real generic CSV file that CSVAdapter can auto-detect."""
+    csv_content = """ra,dec,mag,parallax,source_id
+190.0,47.0,13.5,8.2,custom_001
+190.1,47.1,13.8,8.5,custom_002
+190.2,47.2,13.2,8.1,custom_003
+190.3,47.3,13.9,8.7,custom_004
+"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f.write(csv_content)
+        f.flush()
+        temp_path = f.name
+    
+    yield temp_path
+    
+    if os.path.exists(temp_path):
+        os.unlink(temp_path)
+
+
 # ============================================================================
 # TEST 1: FILE VALIDATION WITH REAL FILES
 # ============================================================================
@@ -242,6 +271,65 @@ def test_sdss_adapter_processes_real_file(real_sdss_csv_file, real_db):
     print(f"✅ SDSSAdapter - 3 real records processed and saved to database")
 
 
+def test_fits_adapter_processes_real_file(real_fits_file, real_db):
+    """Test FITSAdapter with real Hipparcos FITS file."""
+    try:
+        from app.services.adapters.fits_adapter import FITSAdapter
+    except ImportError:
+        pytest.skip("FITSAdapter requires astropy")
+    
+    adapter = FITSAdapter(dataset_id="real-fits-test")
+    valid_records, validation_results = adapter.process_batch(
+        real_fits_file,
+        skip_invalid=True,
+        extension=1  # Use first extension HDU
+    )
+    
+    # Hipparcos sample should have records
+    assert len(valid_records) > 0
+    print(f"  Parsed {len(valid_records)} records from FITS file")
+    
+    # Insert into database
+    db_records = [UnifiedStarCatalog(**r) for r in valid_records[:10]]  # Limit to 10 for test
+    real_db.bulk_save_objects(db_records)
+    real_db.commit()
+    
+    saved = real_db.query(UnifiedStarCatalog).filter_by(
+        dataset_id="real-fits-test"
+    ).all()
+    
+    assert len(saved) == 10
+    assert saved[0].ra_deg is not None
+    assert saved[0].dec_deg is not None
+    print(f"✅ FITSAdapter - {len(saved)} real records processed and saved to database")
+
+
+def test_csv_adapter_processes_real_file(real_generic_csv_file, real_db):
+    """Test generic CSVAdapter with auto-detection."""
+    from app.services.adapters.csv_adapter import CSVAdapter
+    
+    adapter = CSVAdapter(dataset_id="real-csv-test")
+    valid_records, validation_results = adapter.process_batch(
+        real_generic_csv_file,
+        skip_invalid=False
+    )
+    
+    assert len(valid_records) == 4
+    
+    db_records = [UnifiedStarCatalog(**r) for r in valid_records]
+    real_db.bulk_save_objects(db_records)
+    real_db.commit()
+    
+    saved = real_db.query(UnifiedStarCatalog).filter_by(
+        dataset_id="real-csv-test"
+    ).all()
+    
+    assert len(saved) == 4
+    assert saved[0].ra_deg is not None
+    assert saved[0].dec_deg is not None
+    print(f"✅ CSVAdapter - 4 real records processed and saved to database")
+
+
 # ============================================================================
 # TEST 4: COMPLETE END-TO-END PIPELINE
 # ============================================================================
@@ -391,6 +479,133 @@ def test_complete_e2e_pipeline_sdss(real_sdss_csv_file, real_db):
     
     print(f"4. ✅ Metadata created")
     print("\n✅ COMPLETE END-TO-END PIPELINE SUCCESSFUL")
+    print("="*70)
+
+
+def test_complete_e2e_pipeline_fits(real_fits_file, real_db):
+    """Complete pipeline for FITS files."""
+    try:
+        from app.services.adapters.fits_adapter import FITSAdapter
+    except ImportError:
+        pytest.skip("FITSAdapter requires astropy")
+    
+    print("\n" + "="*70)
+    print("COMPLETE END-TO-END PIPELINE TEST (FITS)")
+    print("="*70)
+    
+    # 1. VALIDATE
+    validator = FileValidator()
+    validation_result = validator.validate_file(
+        file_path=real_fits_file,
+        filename="hipparcos_e2e.fits"
+    )
+    
+    assert validation_result.is_valid
+    file_hash = validation_result.file_hash
+    print(f"1. ✅ File validated - hash: {file_hash[:16]}...")
+    
+    # 2. PROCESS
+    adapter = FITSAdapter(dataset_id="e2e-fits-test")
+    valid_records, _ = adapter.process_batch(
+        real_fits_file,
+        skip_invalid=True,
+        extension=1
+    )
+    
+    assert len(valid_records) > 0
+    record_count = min(len(valid_records), 15)  # Limit to 15 for testing
+    print(f"2. ✅ Adapter processed {record_count} records (limited from {len(valid_records)})")
+    
+    # 3. INSERT
+    db_records = [UnifiedStarCatalog(**r) for r in valid_records[:record_count]]
+    real_db.bulk_save_objects(db_records)
+    real_db.commit()
+    
+    saved_count = real_db.query(UnifiedStarCatalog).filter_by(
+        dataset_id="e2e-fits-test"
+    ).count()
+    
+    assert saved_count == record_count
+    print(f"3. ✅ {saved_count} records inserted to real database")
+    
+    # 4. CREATE METADATA
+    dataset = DatasetMetadata(
+        dataset_id="e2e-fits-test",
+        source_name="hipparcos_e2e.fits",
+        catalog_type="fits",
+        adapter_used="FITSAdapter",
+        record_count=record_count,
+        file_hash=file_hash,
+        storage_key="datasets/e2e-fits-test/files/data.fits",
+        license_info="ESA Hipparcos"
+    )
+    
+    real_db.add(dataset)
+    real_db.commit()
+    
+    print(f"4. ✅ Metadata created")
+    print("\n✅ COMPLETE END-TO-END PIPELINE SUCCESSFUL (FITS)")
+    print("="*70)
+
+
+def test_complete_e2e_pipeline_csv(real_generic_csv_file, real_db):
+    """Complete pipeline for generic CSV files."""
+    from app.services.adapters.csv_adapter import CSVAdapter
+    
+    print("\n" + "="*70)
+    print("COMPLETE END-TO-END PIPELINE TEST (GENERIC CSV)")
+    print("="*70)
+    
+    # 1. VALIDATE
+    validator = FileValidator()
+    validation_result = validator.validate_file(
+        file_path=real_generic_csv_file,
+        filename="custom_e2e.csv"
+    )
+    
+    assert validation_result.is_valid
+    file_hash = validation_result.file_hash
+    print(f"1. ✅ File validated - hash: {file_hash[:16]}...")
+    
+    # 2. PROCESS
+    adapter = CSVAdapter(dataset_id="e2e-csv-test")
+    valid_records, _ = adapter.process_batch(
+        real_generic_csv_file,
+        skip_invalid=False
+    )
+    
+    assert len(valid_records) == 4
+    print(f"2. ✅ Adapter processed {len(valid_records)} records")
+    
+    # 3. INSERT
+    db_records = [UnifiedStarCatalog(**r) for r in valid_records]
+    real_db.bulk_save_objects(db_records)
+    real_db.commit()
+    
+    saved_count = real_db.query(UnifiedStarCatalog).filter_by(
+        dataset_id="e2e-csv-test"
+    ).count()
+    
+    assert saved_count == 4
+    print(f"3. ✅ {saved_count} records inserted to real database")
+    
+    # 4. CREATE METADATA
+    dataset = DatasetMetadata(
+        dataset_id="e2e-csv-test",
+        source_name="custom_e2e.csv",
+        catalog_type="csv",
+        adapter_used="CSVAdapter",
+        record_count=4,
+        file_hash=file_hash,
+        storage_key="datasets/e2e-csv-test/files/data.csv",
+        license_info="Custom Catalog"
+    )
+    
+    real_db.add(dataset)
+    real_db.commit()
+    
+    print(f"4. ✅ Metadata created")
+    print("\n✅ COMPLETE END-TO-END PIPELINE SUCCESSFUL (CSV)")
     print("="*70)
 
 
