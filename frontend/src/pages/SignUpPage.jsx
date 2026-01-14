@@ -94,8 +94,8 @@ function SignUpForm({ isVisible }) {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">
-                                    <Mail size={14} />
+                                <label className="form-label" >
+                                    <Mail size={14}  />
                                     Email Address
                                 </label>
                                 <input
