@@ -7,7 +7,7 @@ Provides astronomical search capabilities:
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,19 @@ class SearchService:
         """
         self.repository = StarCatalogRepository(db)
         self.standardizer = CoordinateStandardizer()
+    
+    def get_star_by_id(self, star_id: int) -> Optional[UnifiedStarCatalog]:
+        """
+        Get a single star by its database ID.
+        
+        Args:
+            star_id: The database ID of the star
+            
+        Returns:
+            UnifiedStarCatalog instance or None if not found
+        """
+        logger.info(f"Fetching star with ID: {star_id}")
+        return self.repository.get_by_id(star_id)
     
     def search_bounding_box(
         self,

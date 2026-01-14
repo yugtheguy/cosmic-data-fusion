@@ -476,17 +476,25 @@ class AIDiscoveryService:
             else:
                 cluster_name = f"cluster_{label}"
             
-            # Get indices of stars in this cluster
+            # Get details of stars in this cluster
             mask = cluster_labels == label
-            cluster_star_ids = self._df.loc[mask, "id"].tolist()
-            cluster_star_ids = [int(sid) for sid in cluster_star_ids]
+            cluster_stars_df = self._df.loc[mask]
             
-            clusters[cluster_name] = cluster_star_ids
+            cluster_members = []
+            for _, star in cluster_stars_df.iterrows():
+                cluster_members.append({
+                    "id": int(star["id"]),
+                    "source_id": str(star["source_id"]),
+                    "ra": safe_float(star["ra_deg"]),
+                    "dec": safe_float(star["dec_deg"])
+                })
+            
+            clusters[cluster_name] = cluster_members
             
             # Calculate cluster statistics
             cluster_data = self._df.loc[mask]
             cluster_stats[cluster_name] = {
-                "count": len(cluster_star_ids),
+                "count": len(cluster_members),
                 "mean_ra": safe_float(cluster_data["ra_deg"].mean()),
                 "mean_dec": safe_float(cluster_data["dec_deg"].mean()),
                 "mean_magnitude": safe_float(cluster_data["brightness_mag"].mean()),

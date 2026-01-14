@@ -192,8 +192,11 @@ class StarResponse(BaseModel):
     ra_deg: float
     dec_deg: float
     brightness_mag: float
+    parallax_mas: Optional[float] = None
+    distance_pc: Optional[float] = None
     original_source: str
     raw_frame: str
+    raw_metadata: Optional[dict] = None
     created_at: datetime
 
 

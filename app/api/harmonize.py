@@ -64,6 +64,7 @@ class CrossMatchResponse(BaseModel):
     message: str
     total_stars: int
     groups_created: int
+    total_groups: int = Field(default=0, description="Total fusion groups currently in the database")
     stars_in_groups: int
     isolated_stars: int
     radius_arcsec: float
@@ -148,6 +149,7 @@ async def cross_match_catalogs(
             message=result.get("message", "Cross-match complete"),
             total_stars=result["total_stars"],
             groups_created=result["groups_created"],
+            total_groups=result.get("total_groups", 0),
             stars_in_groups=result["stars_in_groups"],
             isolated_stars=result["isolated_stars"],
             radius_arcsec=result["radius_arcsec"]
@@ -248,6 +250,30 @@ async def get_harmonization_stats(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to retrieve harmonization statistics: {str(e)}"
+        )
+
+
+@router.get(
+    "/groups",
+    summary="List all fusion groups",
+    description="Get a list of all fusion groups with their metadata (position, star count)."
+)
+async def list_fusion_groups(
+    limit: int = 100,
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    List fusion groups for visualization.
+    """
+    try:
+        service = CrossMatchService(db)
+        return service.list_fusion_groups(limit=limit)
+        
+    except Exception as e:
+        logger.error(f"Failed to list groups: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list fusion groups: {str(e)}"
         )
 
 

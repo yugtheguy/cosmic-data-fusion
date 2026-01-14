@@ -32,6 +32,9 @@ build/
 # Logs
 *.log
 
+# Generated output files
+output/
+
 # Environment variables
 .env
 .env.local
