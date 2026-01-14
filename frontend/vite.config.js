@@ -8,8 +8,43 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        changeOrigin: true
+      },
+      '/ingest': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/search': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/visualize': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/datasets': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/harmonize': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/ai': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/query': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/health': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/errors': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
       }
     }
   }

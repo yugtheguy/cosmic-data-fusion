@@ -1,0 +1,262 @@
+/* Schema Mapper Styles */
+.schema-mapper {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    animation: fadeIn 0.4s ease;
+}
+
+.mapper-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.mapper-header h2 {
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.mapper-header p {
+    color: var(--text-secondary);
+}
+
+.mapper-card {
+    background: var(--bg-surface);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+.mapper-card.centered {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* Drop Zone (Reuse upload styles logic) */
+.drop-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 3rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.drop-zone:hover {
+    border-color: var(--accent-primary);
+    background: rgba(212, 104, 58, 0.05);
+}
+
+.upload-icon {
+    color: var(--accent-secondary);
+}
+
+/* File Summary */
+.file-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.badge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+}
+
+/* Mapping Grid */
+.mapping-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+}
+
+.grid-header {
+    display: grid;
+    grid-template-columns: 1fr 24px 1fr;
+    gap: 1rem;
+    align-items: center;
+    padding: 0 1rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.mapping-row {
+    display: grid;
+    grid-template-columns: 1fr 24px 1fr;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.mapping-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.mapping-row.mapped {
+    border-color: rgba(74, 159, 110, 0.3);
+    background: rgba(74, 159, 110, 0.05);
+}
+
+.source-col {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.arrow-icon {
+    color: var(--text-muted);
+}
+
+.mapping-row.mapped .arrow-icon {
+    color: var(--success);
+}
+
+.target-select {
+    width: 100%;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.target-select:focus {
+    border-color: var(--accent-primary);
+}
+
+/* Actions */
+.mapping-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.validation-status {
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.text-success {
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.text-warning {
+    color: var(--warning);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.primary-btn {
+    padding: 0.75rem 2rem;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+    background: #c55a2f;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(212, 104, 58, 0.3);
+}
+
+.primary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.secondary-btn {
+    padding: 0.75rem 2rem;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.secondary-btn:hover {
+    border-color: var(--text-primary);
+    color: var(--text-primary);
+}
+
+/* Result Stats */
+.stat-box {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 120px;
+}
+
+.stat-box .label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.stat-box .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: 0.25rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.stat-box .value.highlight {
+    color: var(--success);
+}
+
+.stat-box .value.small {
+    font-size: 1rem;
+    color: var(--accent-secondary);
+}
+
+.pulse-icon {
+    color: var(--accent-primary);
+    animation: pulse 2s infinite;
+}

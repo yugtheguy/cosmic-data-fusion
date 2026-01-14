@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API Base URL - uses Vite proxy in development
-const API_BASE_URL = '/api';
+const API_BASE_URL = '';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -131,6 +131,75 @@ export const downloadExport = async (format = 'csv') => {
 export const loadGaiaData = async () => {
     // POST /datasets/gaia/load - Load Gaia sample data
     const response = await api.post('/datasets/gaia/load');
+    return response.data;
+};
+
+// ============================================
+// Ingestion APIs
+// ============================================
+export const uploadData = async (file, onUploadProgress) => {
+    // POST /ingest/auto - Auto-detect and ingest file
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post('/ingest/auto', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress,
+    });
+    return response.data;
+};
+
+export const ingestCSV = async (file, mapping, onUploadProgress) => {
+    // POST /ingest/csv - Ingest CSV with mapping
+    const formData = new FormData();
+    formData.append('file', file);
+    if (mapping) {
+        formData.append('column_mapping', JSON.stringify(mapping));
+    }
+
+    const response = await api.post('/ingest/csv', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress,
+    });
+    return response.data;
+};
+
+// ============================================
+// Schema Mapper APIs
+// ============================================
+export const suggestMapping = async (columns, existingMapping = {}) => {
+    const response = await api.post('/api/mapper/suggest/headers', {
+        columns,
+        existing_mapping: existingMapping
+    });
+    return response.data;
+};
+
+export const previewMapping = async (filePath) => {
+    const response = await api.post('/api/mapper/preview', {
+        file_path: filePath,
+        sample_size: 5
+    });
+    return response.data;
+};
+
+export const validateMapping = async (mapping) => {
+    const response = await api.post('/api/mapper/validate', {
+        mapping,
+        min_confidence: 0.0
+    });
+    return response.data;
+};
+
+export const applyMapping = async (datasetId, mapping) => {
+    const response = await api.post('/api/mapper/apply', {
+        dataset_id: datasetId,
+        mapping
+    });
     return response.data;
 };
 
