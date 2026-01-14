@@ -324,4 +324,146 @@
     background: rgba(230, 184, 79, 0.1);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
+    display: flex;
+    align-items: center;
+}
+
+.anomaly-item.clickable {
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.anomaly-item.clickable:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateX(4px);
+}
+
+/* Cluster Explorer */
+.cluster-content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .cluster-content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cluster-explorer {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    height: fit-content;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.cluster-explorer h3 {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cluster-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.cluster-group {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.cluster-group.expanded {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cluster-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+}
+
+.cluster-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.cluster-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.cluster-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.cluster-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.cluster-members {
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid var(--border-color);
+}
+
+.cluster-member-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    transition: all 0.1s;
+}
+
+.cluster-member-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.star-icon {
+    color: var(--accent-secondary);
+    opacity: 0.7;
+}
+
+.coords-hint {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.more-members {
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.no-clusters-msg {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 6px;
+    border: 1px dashed var(--border-color);
 }

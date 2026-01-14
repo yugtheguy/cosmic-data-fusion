@@ -116,6 +116,14 @@ class ClusterStats(BaseModel):
     mag_range: list[float]
 
 
+class ClusterMember(BaseModel):
+    """Minimal star info for cluster member listing."""
+    id: int
+    source_id: str
+    ra: float
+    dec: float
+
+
 class ClusteringResponse(BaseModel):
     """Response for clustering endpoint."""
     success: bool
@@ -124,7 +132,7 @@ class ClusteringResponse(BaseModel):
     n_noise: int
     total_stars: int
     parameters: dict
-    clusters: dict[str, list[int]]
+    clusters: dict[str, list[ClusterMember]]
     cluster_stats: dict[str, ClusterStats]
 
 

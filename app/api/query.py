@@ -76,15 +76,15 @@ class FilterParams(BaseModel):
     ra_min: Optional[float] = Field(
         default=None,
         ge=0,
-        lt=360,
-        description="Minimum Right Ascension in degrees [0, 360).",
+        le=360.0,
+        description="Minimum Right Ascension in degrees [0, 360].",
         examples=[0.0, 180.0]
     )
     ra_max: Optional[float] = Field(
         default=None,
         ge=0,
-        lt=360,
-        description="Maximum Right Ascension in degrees [0, 360).",
+        le=360.0,
+        description="Maximum Right Ascension in degrees [0, 360].",
         examples=[90.0, 270.0]
     )
     dec_min: Optional[float] = Field(

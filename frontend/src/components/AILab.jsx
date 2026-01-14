@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Brain,
     Sparkles,
@@ -8,13 +9,19 @@ import {
     AlertTriangle,
     CheckCircle,
     Loader2,
-    Zap
+    Zap,
+    ChevronRight,
+    ChevronDown,
+    Star
 } from 'lucide-react';
 import Plot from 'react-plotly.js';
 import { detectAnomalies, findClusters } from '../services/api';
 import './AILab.css';
 
 function AILab() {
+    // Navigation
+    const navigate = useNavigate();
+
     // State
     const [activeTab, setActiveTab] = useState('clusters'); // clusters, anomalies, insights
     const [loading, setLoading] = useState(false);
@@ -23,6 +30,7 @@ function AILab() {
     // Clustering state
     const [clusterParams, setClusterParams] = useState({ eps: 0.5, minSamples: 10 });
     const [clusterResult, setClusterResult] = useState(null);
+    const [expandedCluster, setExpandedCluster] = useState(null);
 
     // Anomaly state
     const [contamination, setContamination] = useState(0.05);
@@ -32,6 +40,7 @@ function AILab() {
     const runClustering = async () => {
         setLoading(true);
         setError(null);
+        setExpandedCluster(null);
         try {
             const result = await findClusters(clusterParams.eps, clusterParams.minSamples);
             setClusterResult(result);
@@ -56,6 +65,11 @@ function AILab() {
         }
     };
 
+    // Navigate to star detail
+    const goToStar = (id) => {
+        navigate(`/star/${id}`);
+    };
+
     // Generate cluster plot data
     const getClusterPlotData = () => {
         if (!clusterResult?.clusters) return [];
@@ -66,28 +80,40 @@ function AILab() {
         ];
 
         const traces = [];
-        const clusterIds = Object.keys(clusterResult.clusters);
+        const clusterNames = Object.keys(clusterResult.clusters);
 
-        clusterIds.forEach((clusterId, idx) => {
-            const stats = clusterResult.cluster_stats?.[clusterId];
+        clusterNames.forEach((clusterName, idx) => {
+            const stats = clusterResult.cluster_stats?.[clusterName];
+            const isNoise = clusterName === 'noise';
+
+            // Just plot centroids for now to keep it clean, or we could plot all points if we had them
+            // The backend update now returns ALL points in clusterResult.clusters[clusterName] (list of objects)
+            // So we can plot the actual stars!
+
+            const members = clusterResult.clusters[clusterName];
+            if (!members || members.length === 0) return;
+
+            // Limit points for performance if massive
+            const plotMembers = members.length > 500 ? members.slice(0, 500) : members;
+
             if (stats) {
                 traces.push({
                     type: 'scatter',
                     mode: 'markers',
-                    name: clusterId === '-1' ? 'Noise' : `Cluster ${clusterId}`,
-                    x: [stats.mean_ra],
-                    y: [stats.mean_dec],
+                    name: isNoise ? 'Noise' : `Cluster ${clusterName.replace('cluster_', '')}`,
+                    x: plotMembers.map(m => m.ra),
+                    y: plotMembers.map(m => m.dec),
+                    customdata: plotMembers.map(m => m.id), // Store DB ID for click handler
                     marker: {
-                        size: Math.min(stats.count / 2, 30) + 10,
-                        color: clusterId === '-1' ? '#666' : colors[idx % colors.length],
-                        opacity: clusterId === '-1' ? 0.3 : 0.8,
-                        line: { width: 1, color: '#fff' }
+                        size: isNoise ? 3 : 6,
+                        color: isNoise ? '#666' : colors[idx % colors.length],
+                        opacity: isNoise ? 0.3 : 0.8,
+                        line: { width: 0 }
                     },
-                    text: `${stats.count} stars`,
-                    hovertemplate: `<b>${clusterId === '-1' ? 'Noise' : 'Cluster ' + clusterId}</b><br>` +
-                        `Stars: ${stats.count}<br>` +
-                        `RA: ${stats.mean_ra?.toFixed(2)}°<br>` +
-                        `Dec: ${stats.mean_dec?.toFixed(2)}°<extra></extra>`
+                    text: plotMembers.map(m => m.source_id),
+                    hovertemplate: `<b>%{text}</b><br>` +
+                        `RA: %{x:.2f}°<br>` +
+                        `Dec: %{y:.2f}°<extra></extra>`
                 });
             }
         });
@@ -104,6 +130,7 @@ function AILab() {
             mode: 'markers',
             x: anomalyResult.anomalies.map(a => a.ra_deg),
             y: anomalyResult.anomalies.map(a => a.dec_deg),
+            customdata: anomalyResult.anomalies.map(a => a.id), // Store DB ID
             marker: {
                 size: anomalyResult.anomalies.map(a => Math.abs(a.anomaly_score) * 20 + 8),
                 color: anomalyResult.anomalies.map(a => a.anomaly_score),
@@ -133,7 +160,18 @@ function AILab() {
             zerolinecolor: 'rgba(255,255,255,0.2)'
         },
         showlegend: true,
-        legend: { orientation: 'h', y: -0.15 }
+        legend: { orientation: 'h', y: -0.15 },
+        hovermode: 'closest'
+    };
+
+    // Handle plot clicks
+    const handlePlotClick = (data) => {
+        if (data.points && data.points[0]) {
+            const id = data.points[0].customdata;
+            if (id) {
+                goToStar(id);
+            }
+        }
     };
 
     return (
@@ -207,31 +245,91 @@ function AILab() {
                     </div>
 
                     {clusterResult && (
-                        <>
-                            <div className="result-stats">
-                                <div className="stat-card">
-                                    <span className="stat-value">{clusterResult.n_clusters}</span>
-                                    <span className="stat-label">Clusters Found</span>
+                        <div className="cluster-content-grid">
+                            <div className="cluster-viz">
+                                <div className="result-stats">
+                                    <div className="stat-card">
+                                        <span className="stat-value">{clusterResult.n_clusters}</span>
+                                        <span className="stat-label">Clusters Found</span>
+                                    </div>
+                                    <div className="stat-card">
+                                        <span className="stat-value">{clusterResult.total_stars - clusterResult.n_noise}</span>
+                                        <span className="stat-label">Grouped Stars</span>
+                                    </div>
+                                    <div className="stat-card">
+                                        <span className="stat-value">{clusterResult.n_noise}</span>
+                                        <span className="stat-label">Noise Points</span>
+                                    </div>
                                 </div>
-                                <div className="stat-card">
-                                    <span className="stat-value">{clusterResult.total_stars - clusterResult.n_noise}</span>
-                                    <span className="stat-label">Grouped Stars</span>
-                                </div>
-                                <div className="stat-card">
-                                    <span className="stat-value">{clusterResult.n_noise}</span>
-                                    <span className="stat-label">Noise Points</span>
+
+                                <div className="plot-container">
+                                    <Plot
+                                        data={getClusterPlotData()}
+                                        layout={{ ...plotLayout, title: 'Star Clusters (DBSCAN)' }}
+                                        config={{ responsive: true, displayModeBar: false }}
+                                        style={{ width: '100%', height: '400px' }}
+                                        onClick={handlePlotClick}
+                                    />
                                 </div>
                             </div>
 
-                            <div className="plot-container">
-                                <Plot
-                                    data={getClusterPlotData()}
-                                    layout={{ ...plotLayout, title: 'Star Clusters (DBSCAN)' }}
-                                    config={{ responsive: true, displayModeBar: false }}
-                                    style={{ width: '100%', height: '400px' }}
-                                />
+                            {/* Cluster List / Explorer */}
+                            <div className="cluster-explorer">
+                                <h3>Defined Clusters</h3>
+                                <div className="cluster-list">
+                                    {Object.keys(clusterResult.clusters)
+                                        .filter(name => name !== 'noise')
+                                        .map(clusterName => {
+                                            const stats = clusterResult.cluster_stats[clusterName];
+                                            const isExpanded = expandedCluster === clusterName;
+                                            const members = clusterResult.clusters[clusterName];
+
+                                            return (
+                                                <div key={clusterName} className={`cluster-group ${isExpanded ? 'expanded' : ''}`}>
+                                                    <div
+                                                        className="cluster-header"
+                                                        onClick={() => setExpandedCluster(isExpanded ? null : clusterName)}
+                                                    >
+                                                        <div className="cluster-info">
+                                                            <span className="cluster-name">
+                                                                {clusterName.replace('cluster_', 'Cluster ')}
+                                                            </span>
+                                                            <span className="cluster-count">{stats.count} stars</span>
+                                                        </div>
+                                                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                                    </div>
+
+                                                    {isExpanded && (
+                                                        <div className="cluster-members">
+                                                            {members.slice(0, 50).map((member) => (
+                                                                <div
+                                                                    key={member.id}
+                                                                    className="cluster-member-item"
+                                                                    onClick={() => goToStar(member.id)}
+                                                                >
+                                                                    <Star size={12} className="star-icon" />
+                                                                    <span>{member.source_id}</span>
+                                                                    <span className="coords-hint">
+                                                                        ({member.ra.toFixed(1)}, {member.dec.toFixed(1)})
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                            {members.length > 50 && (
+                                                                <div className="more-members">
+                                                                    + {members.length - 50} more...
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    {Object.keys(clusterResult.clusters).length === 1 && clusterResult.clusters['noise'] && (
+                                        <div className="no-clusters-msg">Only noise found. Try increasing Epsilon.</div>
+                                    )}
+                                </div>
                             </div>
-                        </>
+                        </div>
                     )}
 
                     {!clusterResult && !loading && (
@@ -289,6 +387,7 @@ function AILab() {
                                     layout={{ ...plotLayout, title: 'Anomalous Stars (Isolation Forest)' }}
                                     config={{ responsive: true, displayModeBar: false }}
                                     style={{ width: '100%', height: '400px' }}
+                                    onClick={handlePlotClick}
                                 />
                             </div>
 
@@ -296,8 +395,13 @@ function AILab() {
                             <div className="anomaly-list">
                                 <h4>Top Anomalies</h4>
                                 <div className="anomaly-items">
-                                    {anomalyResult.anomalies.slice(0, 5).map((a, i) => (
-                                        <div key={i} className="anomaly-item">
+                                    {anomalyResult.anomalies.slice(0, 10).map((a, i) => (
+                                        <div
+                                            key={i}
+                                            className="anomaly-item clickable"
+                                            onClick={() => goToStar(a.id)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
                                             <div className="anomaly-rank">#{i + 1}</div>
                                             <div className="anomaly-info">
                                                 <span className="anomaly-id">{a.source_id}</span>
@@ -305,6 +409,7 @@ function AILab() {
                                             </div>
                                             <div className="anomaly-score">
                                                 Score: {Math.abs(a.anomaly_score).toFixed(3)}
+                                                <ChevronRight size={14} style={{ marginLeft: '0.5rem', opacity: 0.5 }} />
                                             </div>
                                         </div>
                                     ))}

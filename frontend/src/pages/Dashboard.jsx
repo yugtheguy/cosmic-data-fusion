@@ -38,7 +38,7 @@ import Harmonizer from '../components/Harmonizer';
 import './Dashboard.css';
 
 // Sidebar Navigation Component
-function Sidebar({ activeTab, setActiveTab, filters, setFilters, onApplyFilters, isLoading }) {
+function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters, isLoading }) {
     const navItems = [
         { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
         { id: 'upload', icon: UploadCloud, label: 'Ingest Data' },
@@ -80,7 +80,7 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onApplyFilters,
                 <FilterControls
                     filters={filters}
                     setFilters={setFilters}
-                    onApplyFilters={onApplyFilters}
+                    onResetFilters={onResetFilters}
                     isLoading={isLoading}
                 />
             </div>
@@ -103,7 +103,7 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onApplyFilters,
 }
 
 // Filter Controls Component
-function FilterControls({ filters, setFilters, onApplyFilters, isLoading }) {
+function FilterControls({ filters, setFilters, onResetFilters, isLoading }) {
     return (
         <div className="filter-controls">
             <div className="filter-group">
@@ -116,7 +116,7 @@ function FilterControls({ filters, setFilters, onApplyFilters, isLoading }) {
                     min="0"
                     max="360"
                     value={filters.ra_min}
-                    onChange={(e) => setFilters({ ...filters, ra_min: parseInt(e.target.value) })}
+                    onChange={(e) => setFilters({ ...filters, ra_min: Number(e.target.value) })}
                     className="range-slider"
                 />
             </div>
@@ -130,7 +130,7 @@ function FilterControls({ filters, setFilters, onApplyFilters, isLoading }) {
                     min="0"
                     max="360"
                     value={filters.ra_max}
-                    onChange={(e) => setFilters({ ...filters, ra_max: parseInt(e.target.value) })}
+                    onChange={(e) => setFilters({ ...filters, ra_max: Number(e.target.value) })}
                     className="range-slider"
                 />
             </div>
@@ -144,7 +144,7 @@ function FilterControls({ filters, setFilters, onApplyFilters, isLoading }) {
                     min="-90"
                     max="90"
                     value={filters.dec_min}
-                    onChange={(e) => setFilters({ ...filters, dec_min: parseInt(e.target.value) })}
+                    onChange={(e) => setFilters({ ...filters, dec_min: Number(e.target.value) })}
                     className="range-slider"
                 />
             </div>
@@ -158,7 +158,7 @@ function FilterControls({ filters, setFilters, onApplyFilters, isLoading }) {
                     min="-90"
                     max="90"
                     value={filters.dec_max}
-                    onChange={(e) => setFilters({ ...filters, dec_max: parseInt(e.target.value) })}
+                    onChange={(e) => setFilters({ ...filters, dec_max: Number(e.target.value) })}
                     className="range-slider"
                 />
             </div>
@@ -178,11 +178,17 @@ function FilterControls({ filters, setFilters, onApplyFilters, isLoading }) {
                 />
             </div>
             <button
-                className="apply-filters-btn"
-                onClick={onApplyFilters}
+                className="apply-filters-btn reset-btn-style"
+                onClick={onResetFilters}
                 disabled={isLoading}
+                style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    marginTop: '1rem'
+                }}
             >
-                {isLoading ? 'Loading...' : 'Apply Filters'}
+                <RefreshCw size={14} />
+                Reset Filters
             </button>
         </div>
     );
@@ -438,7 +444,7 @@ function AnomalyList({ anomalies, isLoading }) {
 }
 
 // Upload View Component
-function UploadView() {
+function UploadView({ setActiveTab }) {
     const [dragActive, setDragActive] = useState(false);
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
@@ -615,9 +621,36 @@ function UploadView() {
                             </div>
                         </div>
 
-                        <button className="reset-btn" onClick={resetUpload}>
-                            Upload Another File
-                        </button>
+                        <div className="action-buttons" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                            <button
+                                className="visualize-btn"
+                                onClick={() => setActiveTab('skymap')}
+                                style={{
+                                    background: 'linear-gradient(135deg, #e8a87c 0%, #d4683a 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '0.75rem 1.5rem',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    flex: 1,
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <Map size={18} />
+                                Visualize in Sky Map
+                            </button>
+                            <button
+                                className="reset-btn"
+                                onClick={resetUpload}
+                                style={{ flex: 1 }}
+                            >
+                                Upload Another File
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -644,17 +677,18 @@ function Dashboard() {
         max_mag: 20
     });
 
-    // Apply filters - re-fetch stars with filter params
-    const handleApplyFilters = async () => {
+    // Unified fetch logic
+    const fetchStarsData = useCallback(async () => {
         setIsLoading(true);
         try {
+            // Number() ensures we handle 0 correctly and don't get NaN
             const starsResponse = await searchStars({
                 limit: 1000,
-                ra_min: filters.ra_min,
-                ra_max: filters.ra_max,
-                dec_min: filters.dec_min,
-                dec_max: filters.dec_max,
-                max_mag: filters.max_mag
+                ra_min: Number(filters.ra_min),
+                ra_max: Number(filters.ra_max),
+                dec_min: Number(filters.dec_min),
+                dec_max: Number(filters.dec_max),
+                max_mag: Number(filters.max_mag)
             });
             setStars(starsResponse.records || []);
             setStats(prev => ({
@@ -663,10 +697,44 @@ function Dashboard() {
             }));
         } catch (err) {
             console.error('Failed to apply filters:', err);
+            setError('Failed to update filters. Check server connection.');
         } finally {
             setIsLoading(false);
         }
+    }, [filters]);
+
+    // Manual apply (for the button) - Kept for safety against stale HMR/Cache
+    const handleApplyFilters = () => {
+        fetchStarsData();
     };
+
+    // Reset filters to defaults
+    const handleResetFilters = () => {
+        setFilters({
+            ra_min: 0,
+            ra_max: 360,
+            dec_min: -90,
+            dec_max: 90,
+            max_mag: 20
+        });
+        // The useEffect will pick up the change and auto-fetch
+    };
+
+    // Auto-apply filters with debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchStarsData();
+        }, 800);
+
+        return () => clearTimeout(timer);
+    }, [fetchStarsData]);
+
+    // Initial data load handled by separate effect below, but we can merge if needed.
+    // Ideally, we want initial load to populate filters, or filters to drive initial load.
+    // The existing 'Fetch data on mount' effect does health check + initial load.
+    // To avoid double-fetch, we should rely on this filter effect for updates.
+    // However, the initial load includes anomaly detection checks which this doesn't.
+    // So we keep them separate but be aware of potential race condition on mount.
 
     // Fetch data on mount
     useEffect(() => {
@@ -754,7 +822,7 @@ function Dashboard() {
                 setActiveTab={setActiveTab}
                 filters={filters}
                 setFilters={setFilters}
-                onApplyFilters={handleApplyFilters}
+                onResetFilters={handleResetFilters}
                 isLoading={isLoading}
             />
 
@@ -768,7 +836,7 @@ function Dashboard() {
                         <button onClick={() => window.location.reload()}>Retry</button>
                     </div>
                 ) : activeTab === 'upload' ? (
-                    <SchemaMapper />
+                    <UploadView setActiveTab={setActiveTab} />
                 ) : activeTab === 'anomaly' ? (
                     <AILab />
                 ) : activeTab === 'harmonize' ? (
