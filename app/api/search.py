@@ -20,6 +20,9 @@ from app.schemas import (
     SearchResponse,
 )
 from app.services.search import SearchService
+from app.services.gaia import GaiaService
+from app.repository.star_catalog import StarCatalogRepository
+from app.models import UnifiedStarCatalog
 
 logger = logging.getLogger(__name__)
 
@@ -195,3 +198,198 @@ def search_cone(
             status_code=500,
             detail=f"Database error: {str(e)}"
         )
+
+
+@router.get(
+    "/star/{star_id}",
+    response_model=StarResponse,
+    summary="Get single star by ID",
+    description="Retrieve detailed information about a specific star."
+)
+def get_star_by_id(
+    star_id: int,
+    db: Session = Depends(get_db)
+) -> StarResponse:
+    """
+    Get a single star by its database ID.
+    
+    Args:
+        star_id: The database ID of the star
+        db: Database session (injected)
+        
+    Returns:
+        StarResponse with full star details
+        
+    Raises:
+        HTTPException 404: Star not found
+        HTTPException 500: Database error
+    """
+    try:
+        service = SearchService(db)
+        star = service.get_star_by_id(star_id)
+        
+        if star is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Star with ID {star_id} not found"
+            )
+        
+        return StarResponse.model_validate(star)
+        
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching star {star_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+
+
+@router.get(
+    "/star/{star_id}/nearby",
+    response_model=SearchResponse,
+    summary="Find nearby stars",
+    description="Find stars near a specific star within a given radius."
+)
+def get_nearby_stars(
+    star_id: int,
+    radius: float = Query(
+        default=0.5, gt=0.0, le=10.0,
+        description="Search radius in degrees"
+    ),
+    limit: int = Query(
+        default=50, ge=1, le=500,
+        description="Maximum results to return"
+    ),
+    db: Session = Depends(get_db)
+) -> SearchResponse:
+    """
+    Find stars near a specific star.
+    
+    First retrieves the target star's coordinates, then performs
+    a cone search around that position.
+    
+    Args:
+        star_id: The database ID of the reference star
+        radius: Search radius in degrees (default 0.5)
+        limit: Maximum number of nearby stars to return
+        db: Database session (injected)
+        
+    Returns:
+        SearchResponse with nearby stars (excluding the target star itself)
+        
+    Raises:
+        HTTPException 404: Target star not found
+        HTTPException 500: Database error
+    """
+    try:
+        service = SearchService(db)
+        
+        # First get the target star
+        target_star = service.get_star_by_id(star_id)
+        if target_star is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Star with ID {star_id} not found"
+            )
+        
+        # Perform cone search around the target star
+        nearby_stars = service.search_cone(
+            ra=target_star.ra_deg,
+            dec=target_star.dec_deg,
+            radius=radius,
+            limit=limit + 1  # +1 to account for the target star itself
+        )
+        
+        # Filter out the target star from results
+        nearby_stars = [s for s in nearby_stars if s.id != star_id][:limit]
+        
+        star_responses = [
+            StarResponse.model_validate(star) for star in nearby_stars
+        ]
+        
+        return SearchResponse(
+            count=len(star_responses),
+            stars=star_responses
+        )
+        
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error finding nearby stars for {star_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+@router.post(
+    "/star/{star_id}/refresh-gaia",
+    response_model=StarResponse,
+    summary="Fetch real-time data from Gaia",
+    description="Query ESA Gaia Archive for this star and update the database with real scientific values."
+)
+def refresh_star_from_gaia(
+    star_id: int,
+    db: Session = Depends(get_db)
+) -> StarResponse:
+    """
+    Fetch and update star data from Gaia Archive.
+    """
+    try:
+        # 1. Get local star to find its source_id
+        service = SearchService(db)
+        local_star = service.get_star_by_id(star_id)
+        
+        if not local_star:
+            raise HTTPException(status_code=404, detail="Star not found")
+            
+        # 2. Query Gaia Archive with Fallback
+        gaia_data = GaiaService.fetch_star_data(
+            source_id=local_star.source_id, 
+            ra=local_star.ra_deg, 
+            dec=local_star.dec_deg
+        )
+        
+        if not gaia_data:
+            raise HTTPException(
+                status_code=502, 
+                detail="Could not fetch data from Gaia Archive. Star might not exist in DR3 or service is down."
+            )
+            
+        # 3. Update local database
+        # We access the repository directly or via service to update
+        # For simplicity, we'll do a direct update here since we have the DB session
+        
+        local_star.parallax_mas = gaia_data.get("parallax")
+        
+        # Use GSP-Phot distance if available, else calculate from parallax
+        dist = gaia_data.get("distance")
+        if dist is None and local_star.parallax_mas and local_star.parallax_mas > 0:
+            dist = 1000.0 / local_star.parallax_mas
+            
+        local_star.distance_pc = dist
+        
+        # Update metadata to indicate this is real data
+        meta = local_star.raw_metadata or {}
+        if isinstance(meta, str):
+            import json
+            try: meta = json.loads(meta)
+            except: meta = {}
+            
+        meta["data_source"] = "Gaia DR3 (Live Fetch)"
+        meta["fetched_at"] = "Just now"
+        meta["radial_velocity"] = gaia_data.get("radial_velocity")
+        meta["effective_temperature"] = gaia_data.get("teff")
+        
+        local_star.raw_metadata = meta
+        
+        db.commit()
+        db.refresh(local_star)
+        
+        return StarResponse.model_validate(local_star)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating star from Gaia: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

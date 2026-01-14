@@ -1,0 +1,327 @@
+/* Landing Page Styles */
+
+.landing-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, #0a1628 0%, #000510 100%);
+}
+
+.landing-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* UI Overlay */
+.landing-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.landing-overlay.exiting {
+    transform: translateY(-150%);
+    opacity: 0;
+}
+
+/* Title Styling */
+.landing-title-container {
+    text-align: center;
+    margin-bottom: 3rem;
+    transform: translateY(-50px);
+}
+
+.landing-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(4rem, 12vw, 10rem);
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.05em;
+    line-height: 1;
+}
+
+.title-cosmic {
+    background: linear-gradient(135deg,
+            #ffffff 0%,
+            #a5b4fc 25%,
+            #ffffff 50%,
+            #c4b5fd 75%,
+            #ffffff 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 3s ease-in-out infinite;
+    text-shadow: 0 0 80px rgba(165, 180, 252, 0.5);
+}
+
+@keyframes shimmer {
+
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+.landing-subtitle {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1rem, 2.5vw, 1.5rem);
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 0.5rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+}
+
+.landing-tagline {
+    font-family: 'Inter', sans-serif;
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 1rem;
+    font-style: italic;
+}
+
+/* Enter Button */
+.enter-button {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 2.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50px;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.enter-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.2),
+            transparent);
+    transition: left 0.5s ease;
+}
+
+.enter-button:hover::before {
+    left: 100%;
+}
+
+.enter-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+    box-shadow:
+        0 0 30px rgba(165, 180, 252, 0.3),
+        0 0 60px rgba(165, 180, 252, 0.1);
+}
+
+.enter-button svg {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.3s ease;
+}
+
+.enter-button:hover svg {
+    transform: translate(3px, -3px);
+}
+
+.enter-button.hidden {
+    opacity: 0;
+    transform: scale(0.8);
+    pointer-events: none;
+}
+
+/* ========================================
+   CLOUD TRANSITION OVERLAY
+   ======================================== */
+.cloud-transition {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+.cloud-transition.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* Individual Clouds */
+.cloud {
+    position: absolute;
+    background: radial-gradient(ellipse at center,
+            rgba(200, 210, 230, 0.9) 0%,
+            rgba(180, 190, 210, 0.7) 30%,
+            rgba(150, 160, 180, 0.4) 60%,
+            transparent 100%);
+    border-radius: 50%;
+    filter: blur(20px);
+    animation: cloudFloat 3s ease-in-out infinite;
+}
+
+.cloud-1 {
+    width: 600px;
+    height: 300px;
+    top: -100px;
+    left: -100px;
+    animation-delay: 0s;
+}
+
+.cloud-2 {
+    width: 800px;
+    height: 400px;
+    top: -150px;
+    right: -200px;
+    animation-delay: 0.5s;
+}
+
+.cloud-3 {
+    width: 700px;
+    height: 350px;
+    bottom: -100px;
+    left: 10%;
+    animation-delay: 1s;
+}
+
+.cloud-4 {
+    width: 500px;
+    height: 250px;
+    bottom: -80px;
+    right: 5%;
+    animation-delay: 1.5s;
+}
+
+.cloud-5 {
+    width: 900px;
+    height: 450px;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    animation-delay: 0.3s;
+}
+
+@keyframes cloudFloat {
+
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 0.8;
+    }
+
+    50% {
+        transform: translateY(-20px) scale(1.05);
+        opacity: 1;
+    }
+}
+
+/* Loading indicator in center of clouds */
+.cloud-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    z-index: 101;
+}
+
+.loading-ring {
+    width: 60px;
+    height: 60px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: rgba(165, 180, 252, 0.9);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.25rem;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.1em;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .landing-title-container {
+        transform: translateY(-30px);
+    }
+
+    .enter-button {
+        padding: 0.875rem 2rem;
+        font-size: 0.9rem;
+    }
+
+    .cloud {
+        filter: blur(15px);
+    }
+
+    .cloud-1,
+    .cloud-2,
+    .cloud-3,
+    .cloud-4,
+    .cloud-5 {
+        transform: scale(0.7);
+    }
+}
+
+/* Vignette effect */
+.landing-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at center,
+            transparent 0%,
+            transparent 50%,
+            rgba(0, 5, 16, 0.8) 100%);
+    pointer-events: none;
+    z-index: 5;
+}

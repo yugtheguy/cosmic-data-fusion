@@ -1,0 +1,251 @@
+import { useRef, useState, useEffect, Suspense } from 'react';
+import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
+import { useGLTF, Stars, Html } from '@react-three/drei';
+import { useNavigate } from 'react-router-dom';
+import gsap from 'gsap';
+import * as THREE from 'three';
+import './LandingPage.css';
+
+// Planet Component - GLTF model
+function Planet({ planetRef, isTransitioning }) {
+    const { scene } = useGLTF('/Assets/GLTFS/mars.glb');
+
+    useFrame((state) => {
+        if (planetRef.current && !isTransitioning) {
+            planetRef.current.rotation.y += 0.0005;
+        }
+    });
+
+    return (
+        <primitive
+            ref={planetRef}
+            object={scene}
+            scale={0.010}
+            position={[0, -5.5, 0]}
+            rotation={[0.1, 0, 0]}
+        />
+    );
+}
+
+// Animated Stars Background
+function AnimatedStars({ starsRef }) {
+    useFrame((state) => {
+        if (starsRef.current) {
+            starsRef.current.rotation.x = state.clock.elapsedTime * 0.02;
+            starsRef.current.rotation.y = state.clock.elapsedTime * 0.01;
+        }
+    });
+
+    return (
+        <group ref={starsRef}>
+            <Stars
+                radius={100}
+                depth={50}
+                count={5000}
+                factor={4}
+                saturation={0}
+                fade
+                speed={1}
+            />
+        </group>
+    );
+}
+
+// Camera Controller for Zoom Animation
+function CameraController({ isTransitioning, onCameraComplete }) {
+    const { camera } = useThree();
+
+    useEffect(() => {
+        if (isTransitioning) {
+            // Camera dives into the planet
+            gsap.to(camera.position, {
+                z: -5,
+                y: -10,
+                duration: 2.5,
+                ease: "power3.inOut",
+                onComplete: onCameraComplete
+            });
+
+            gsap.to(camera.rotation, {
+                x: -0.8,
+                duration: 2.5,
+                ease: "power3.inOut"
+            });
+        }
+    }, [isTransitioning, camera, onCameraComplete]);
+
+    return null;
+}
+
+// Floating Astronaut as 2D Sprite
+function Astronaut({ astronautRef }) {
+    const texture = useLoader(THREE.TextureLoader, '/Assets/Images/Picture1.png');
+
+    return (
+        <sprite ref={astronautRef} position={[0, 0.5, 2]} scale={[4.5, 4.5, 1]}>
+            <spriteMaterial map={texture} transparent={true} />
+        </sprite>
+    );
+}
+
+// Main 3D Scene
+function Scene({ isTransitioning, onCameraComplete }) {
+    const planetRef = useRef();
+    const astronautRef = useRef();
+    const starsRef = useRef();
+
+    useEffect(() => {
+        if (isTransitioning) {
+            // Planet zooms down and scales up (entering atmosphere effect)
+            if (planetRef.current) {
+                gsap.to(planetRef.current.position, {
+                    y: -25,
+                    z: 10,
+                    duration: 2.5,
+                    ease: "power3.inOut"
+                });
+                gsap.to(planetRef.current.scale, {
+                    x: 0.05,
+                    y: 0.05,
+                    z: 0.05,
+                    duration: 2.5,
+                    ease: "power3.inOut"
+                });
+                gsap.to(planetRef.current.rotation, {
+                    x: 1.2,
+                    duration: 2.5,
+                    ease: "power3.inOut"
+                });
+            }
+
+            // Astronaut exits upward and fades
+            if (astronautRef.current) {
+                gsap.to(astronautRef.current.position, {
+                    y: 15,
+                    duration: 1.5,
+                    ease: "power2.in"
+                });
+                gsap.to(astronautRef.current.material, {
+                    opacity: 0,
+                    duration: 1,
+                    ease: "power2.in"
+                });
+            }
+
+            // Stars speed up rotation
+            if (starsRef.current) {
+                gsap.to(starsRef.current.rotation, {
+                    z: Math.PI * 4,
+                    y: Math.PI * 2,
+                    duration: 2.5,
+                    ease: "power2.inOut"
+                });
+            }
+        }
+    }, [isTransitioning]);
+
+    return (
+        <>
+            <ambientLight intensity={0.3} />
+            <directionalLight position={[10, 10, 5]} intensity={1} />
+            <pointLight position={[-10, -10, -10]} intensity={0.5} color="#4444ff" />
+
+            <AnimatedStars starsRef={starsRef} />
+
+            <Suspense fallback={null}>
+                <Planet planetRef={planetRef} isTransitioning={isTransitioning} />
+                <Astronaut astronautRef={astronautRef} />
+            </Suspense>
+
+            <CameraController
+                isTransitioning={isTransitioning}
+                onCameraComplete={onCameraComplete}
+            />
+        </>
+    );
+}
+
+// Cloud Transition Component
+function CloudTransition({ isActive, onComplete }) {
+    return (
+        <div className={`cloud-transition ${isActive ? 'active' : ''}`}>
+            <div className="cloud cloud-1"></div>
+            <div className="cloud cloud-2"></div>
+            <div className="cloud cloud-3"></div>
+            <div className="cloud cloud-4"></div>
+            <div className="cloud cloud-5"></div>
+            <div className="cloud-center">
+                <div className="loading-ring"></div>
+                <span className="loading-text">Entering Atmosphere...</span>
+            </div>
+        </div>
+    );
+}
+
+// Main Landing Page Component
+function LandingPage() {
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [showClouds, setShowClouds] = useState(false);
+    const [textExiting, setTextExiting] = useState(false);
+    const navigate = useNavigate();
+
+    const handleEnterClick = () => {
+        setIsTransitioning(true);
+        setTextExiting(true);
+
+        // Show clouds overlay after a delay
+        setTimeout(() => {
+            setShowClouds(true);
+        }, 1500);
+    };
+
+    const handleCameraComplete = () => {
+        // Navigate after cloud transition is visible
+        setTimeout(() => {
+            navigate('/login');
+        }, 800);
+    };
+
+    return (
+        <div className="landing-container">
+            {/* 3D Canvas */}
+            <Canvas
+                camera={{ position: [0, 0, 8], fov: 60 }}
+                className="landing-canvas"
+            >
+                <Scene
+                    isTransitioning={isTransitioning}
+                    onCameraComplete={handleCameraComplete}
+                />
+            </Canvas>
+
+            {/* UI Overlay */}
+            <div className={`landing-overlay ${textExiting ? 'exiting' : ''}`}>
+                {/* Logo / Title */}
+                <div className="landing-title-container">
+                    <h1 className="landing-title">
+                        <span className="title-cosmic">COSMIC</span>
+                    </h1>
+                    <p className="landing-subtitle">Data Fusion Platform</p>
+                    <p className="landing-tagline">Explore the infinite.</p>
+                </div>
+
+                {/* Enter Button */}
+                <button
+                    className={`enter-button ${isTransitioning ? 'hidden' : ''}`}
+                    onClick={handleEnterClick}
+                >
+                    <span>Enter COSMIC</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M7 17L17 7M17 7H7M17 7V17" />
+                    </svg>
+                </button>
+            </div>
+
+            {/* Cloud Transition Overlay */}
+            <CloudTransition isActive={showClouds} onComplete={handleCameraComplete} />
+        </div>
+    );
+}
+
+export default LandingPage;
