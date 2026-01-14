@@ -14,7 +14,12 @@ Phase: 5 - AI-Assisted Discovery
 
 import logging
 import math
+import warnings
+import os
 from typing import Dict, List, Any, Optional, Tuple
+
+# Set LOKY_MAX_CPU_COUNT before importing sklearn to suppress joblib warning (Windows-specific)
+os.environ.setdefault('LOKY_MAX_CPU_COUNT', str(os.cpu_count() or 4))
 
 import numpy as np
 import pandas as pd
@@ -24,6 +29,9 @@ from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import Session
 
 from app.models import UnifiedStarCatalog
+
+# Suppress joblib warning about physical cores (Windows-specific)
+warnings.filterwarnings("ignore", category=UserWarning, module="joblib")
 
 logger = logging.getLogger(__name__)
 
@@ -184,23 +192,28 @@ class AIDiscoveryService:
         
         null_parallax_count = self._df["parallax_mas"].isnull().sum()
         if null_parallax_count > 0:
-            median_parallax = self._df["parallax_mas"].median()
+            # Check if all values are null to avoid warnings
+            valid_parallax = self._df["parallax_mas"].dropna()
             
-            # If ALL values are null, median will be NaN - use a default value
-            # Default: 1.0 mas corresponds to ~1000 parsecs (typical for distant stars)
-            if pd.isna(median_parallax):
+            if len(valid_parallax) == 0:
+                # ALL values are null - use default value
                 median_parallax = 1.0
                 logger.warning(
                     f"All {null_parallax_count} parallax values are null. "
                     f"Using default value of {median_parallax} mas"
                 )
             else:
+                # Some valid values exist - use median
+                median_parallax = valid_parallax.median()
                 logger.info(
                     f"Imputed {null_parallax_count} null parallax values with "
                     f"median={median_parallax:.4f} mas"
                 )
             
-            self._df["parallax_mas"] = self._df["parallax_mas"].fillna(median_parallax)
+            # Suppress pandas FutureWarning about fillna downcasting (internal pandas behavior)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=FutureWarning, message=".*Downcasting.*")
+                self._df["parallax_mas"] = self._df["parallax_mas"].fillna(median_parallax)
         
         # Step 4: Apply StandardScaler to feature columns
         # ------------------------------------------------
