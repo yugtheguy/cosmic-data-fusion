@@ -265,6 +265,7 @@ function StatCard({ icon: Icon, label, value, trend, isLoading }) {
 // Sky Map Component
 function SkyMap({ stars, anomalies, isLoading }) {
     const [showAnomalies, setShowAnomalies] = useState(true);
+    const navigate = useNavigate();
 
     // Prepare plot data
     const anomalyIds = new Set(anomalies?.map(a => a.id) || []);
@@ -280,12 +281,13 @@ function SkyMap({ stars, anomalies, isLoading }) {
             name: 'Stars',
             x: normalStars.map(s => 360 - (s.ra_deg || 0)),
             y: normalStars.map(s => s.dec_deg || 0),
+            customdata: normalStars.map(s => s.id),
             marker: {
                 size: normalStars.map(s => Math.max(3, 12 - (s.brightness_mag || 10))),
                 color: '#e8a87c',
                 opacity: 0.8,
             },
-            text: normalStars.map(s => `${s.source_id}<br>RA: ${s.ra_deg?.toFixed(2)}°<br>Dec: ${s.dec_deg?.toFixed(2)}°<br>Mag: ${s.brightness_mag?.toFixed(2)}`),
+            text: normalStars.map(s => `${s.source_id}<br>RA: ${s.ra_deg?.toFixed(2)}°<br>Dec: ${s.dec_deg?.toFixed(2)}°<br>Mag: ${s.brightness_mag?.toFixed(2)}<br><i>Click to view details</i>`),
             hoverinfo: 'text',
         },
         // Anomalies
@@ -295,13 +297,14 @@ function SkyMap({ stars, anomalies, isLoading }) {
             name: 'Anomalies',
             x: anomalyStars.map(s => 360 - (s.ra_deg || 0)),
             y: anomalyStars.map(s => s.dec_deg || 0),
+            customdata: anomalyStars.map(s => s.id),
             marker: {
                 size: 12,
                 color: '#d4683a',
                 symbol: 'diamond',
                 line: { width: 1, color: '#e8a87c' }
             },
-            text: anomalyStars.map(s => `⚠️ ANOMALY<br>${s.source_id}<br>RA: ${s.ra_deg?.toFixed(2)}°<br>Dec: ${s.dec_deg?.toFixed(2)}°`),
+            text: anomalyStars.map(s => `⚠️ ANOMALY<br>${s.source_id}<br>RA: ${s.ra_deg?.toFixed(2)}°<br>Dec: ${s.dec_deg?.toFixed(2)}°<br><i>Click to view details</i>`),
             hoverinfo: 'text',
         }] : []),
     ];
@@ -336,6 +339,7 @@ function SkyMap({ stars, anomalies, isLoading }) {
             font: { size: 11 }
         },
         dragmode: 'zoom',
+        hovermode: 'closest',
     };
 
     const config = {
@@ -345,11 +349,23 @@ function SkyMap({ stars, anomalies, isLoading }) {
         responsive: true,
     };
 
+    // Handle click on star
+    const handlePlotClick = (event) => {
+        if (event.points && event.points.length > 0) {
+            const point = event.points[0];
+            const starId = point.customdata;
+            if (starId) {
+                navigate(`/star/${starId}`);
+            }
+        }
+    };
+
     return (
         <div className="skymap-container">
             <div className="skymap-header">
                 <h2>Interactive Sky Map</h2>
                 <div className="skymap-controls">
+                    <span className="click-hint">Click on any star to view details</span>
                     <label className="toggle-label">
                         <input
                             type="checkbox"
@@ -373,6 +389,7 @@ function SkyMap({ stars, anomalies, isLoading }) {
                         config={config}
                         style={{ width: '100%', height: '100%' }}
                         useResizeHandler={true}
+                        onClick={handlePlotClick}
                     />
                 )}
             </div>
@@ -382,6 +399,8 @@ function SkyMap({ stars, anomalies, isLoading }) {
 
 // Anomaly List Component
 function AnomalyList({ anomalies, isLoading }) {
+    const navigate = useNavigate();
+
     return (
         <div className="anomaly-list">
             <div className="list-header">
@@ -392,7 +411,13 @@ function AnomalyList({ anomalies, isLoading }) {
                 {isLoading ? (
                     <div className="list-loading">Loading...</div>
                 ) : anomalies?.slice(0, 8).map((anomaly, index) => (
-                    <div key={anomaly.id} className="anomaly-item" style={{ animationDelay: `${index * 0.05}s` }}>
+                    <div
+                        key={anomaly.id}
+                        className="anomaly-item clickable"
+                        style={{ animationDelay: `${index * 0.05}s` }}
+                        onClick={() => navigate(`/star/${anomaly.id}`)}
+                        title="Click to view star details"
+                    >
                         <div className="anomaly-indicator">
                             <span className="pulse-dot"></span>
                         </div>

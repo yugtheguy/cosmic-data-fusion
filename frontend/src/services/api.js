@@ -59,6 +59,20 @@ export const coneSearch = async (ra_center, dec_center, radius_deg, limit = 1000
     return response.data;
 };
 
+export const getStarById = async (starId) => {
+    // GET /search/star/{id} - Get single star by ID
+    const response = await api.get(`/search/star/${starId}`);
+    return response.data;
+};
+
+export const getNearbyStars = async (starId, radius = 0.5, limit = 50) => {
+    // GET /search/star/{id}/nearby - Find nearby stars
+    const response = await api.get(`/search/star/${starId}/nearby`, {
+        params: { radius, limit }
+    });
+    return response.data;
+};
+
 // ============================================
 // AI Discovery APIs
 // ============================================
@@ -71,6 +85,18 @@ export const detectAnomalies = async (contamination = 0.05) => {
 export const findClusters = async (eps = 0.5, min_samples = 5) => {
     // POST /ai/clusters - Find spatial clusters with DBSCAN
     const response = await api.post('/ai/clusters', { eps, min_samples });
+    return response.data;
+};
+
+export const checkStarAnomaly = async (starId) => {
+    // GET /ai/anomaly-check/{star_id} - Check if star is an anomaly
+    const response = await api.get(`/ai/anomaly-check/${starId}`);
+    return response.data;
+};
+
+export const refreshStarFromGaia = async (starId) => {
+    // POST /search/star/{id}/refresh-gaia - Refresh data from ESA Gaia Archive
+    const response = await api.post(`/search/star/${starId}/refresh-gaia`);
     return response.data;
 };
 

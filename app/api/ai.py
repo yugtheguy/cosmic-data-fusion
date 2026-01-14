@@ -389,3 +389,187 @@ async def get_insights(
                 "message": f"An unexpected error occurred: {str(e)}"
             }
         )
+
+
+# ============================================================
+# SINGLE STAR ANOMALY CHECK
+# ============================================================
+
+class StarAnomalyCheckResponse(BaseModel):
+    """Response for single star anomaly check."""
+    star_id: int
+    source_id: str
+    is_anomaly: bool
+    anomaly_score: Optional[float] = None
+    anomaly_rank: Optional[int] = None
+    total_anomalies: int
+    explanation: str
+    feature_deviations: dict
+    recommendations: list[str]
+
+
+@router.get(
+    "/anomaly-check/{star_id}",
+    response_model=StarAnomalyCheckResponse,
+    summary="Check if a star is an anomaly",
+    description="""
+Check whether a specific star has been flagged as an anomaly and explain why.
+
+**How it works:**
+- Runs anomaly detection on the entire catalog
+- Checks if the specified star is in the anomaly list
+- Calculates how much each feature deviates from the catalog average
+- Provides a human-readable explanation
+
+**Returns:**
+- Whether the star is flagged as anomaly
+- Anomaly score (if anomalous)
+- Feature deviations explaining what makes it unusual
+- Recommendations for follow-up
+    """
+)
+async def check_star_anomaly(
+    star_id: int,
+    db: Session = Depends(get_db)
+) -> StarAnomalyCheckResponse:
+    """
+    Check if a specific star is an anomaly and explain why.
+    """
+    try:
+        logger.info(f"Checking anomaly status for star ID: {star_id}")
+        
+        # First, get the star from database
+        from app.models import UnifiedStarCatalog
+        star = db.query(UnifiedStarCatalog).filter(
+            UnifiedStarCatalog.id == star_id
+        ).first()
+        
+        if star is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "not_found", "message": f"Star with ID {star_id} not found"}
+            )
+        
+        # Run anomaly detection
+        service = AIDiscoveryService(db)
+        service.load_data()
+        anomalies = service.detect_anomalies(contamination=0.05)
+        
+        # Check if this star is in the anomaly list
+        anomaly_data = None
+        anomaly_rank = None
+        for i, a in enumerate(anomalies):
+            if a["id"] == star_id:
+                anomaly_data = a
+                anomaly_rank = i + 1
+                break
+        
+        is_anomaly = anomaly_data is not None
+        
+        # Calculate feature deviations from catalog averages
+        df = service._df
+        feature_deviations = {}
+        
+        # Calculate z-scores (how many standard deviations from mean)
+        for col in ["ra_deg", "dec_deg", "brightness_mag", "parallax_mas"]:
+            star_value = getattr(star, col) or 0
+            col_mean = df[col].mean()
+            col_std = df[col].std()
+            
+            if col_std > 0:
+                z_score = (star_value - col_mean) / col_std
+            else:
+                z_score = 0
+                
+            feature_deviations[col] = {
+                "value": round(star_value, 4),
+                "catalog_mean": round(col_mean, 4),
+                "catalog_std": round(col_std, 4),
+                "z_score": round(z_score, 2),
+                "deviation_level": (
+                    "extreme" if abs(z_score) > 3 else
+                    "high" if abs(z_score) > 2 else
+                    "moderate" if abs(z_score) > 1 else
+                    "normal"
+                )
+            }
+        
+        # Generate explanation
+        if is_anomaly:
+            # Find which features deviate the most
+            extreme_features = [
+                k for k, v in feature_deviations.items() 
+                if v["deviation_level"] in ["extreme", "high"]
+            ]
+            
+            explanation_parts = [f"This star is flagged as an ANOMALY (rank #{anomaly_rank} of {len(anomalies)})."]
+            
+            if extreme_features:
+                feature_names = {
+                    "ra_deg": "Right Ascension",
+                    "dec_deg": "Declination", 
+                    "brightness_mag": "Brightness",
+                    "parallax_mas": "Parallax"
+                }
+                extreme_names = [feature_names.get(f, f) for f in extreme_features]
+                explanation_parts.append(
+                    f"The most unusual features are: {', '.join(extreme_names)}."
+                )
+            
+            explanation_parts.append(
+                "The Isolation Forest algorithm detected this star as an outlier "
+                "based on its unusual combination of position, brightness, and distance properties."
+            )
+            
+            explanation = " ".join(explanation_parts)
+            
+            recommendations = [
+                "Verify the source data for measurement errors.",
+                "Cross-reference with other catalogs (SIMBAD, VizieR).",
+                "Check for known variable star classification.",
+                "Consider as candidate for follow-up observation."
+            ]
+        else:
+            explanation = (
+                "This star exhibits NORMAL behavior within the catalog. "
+                "Its position, brightness, and parallax fall within typical ranges "
+                "and it was not flagged by the anomaly detection algorithm."
+            )
+            recommendations = [
+                "No special action needed - star properties are typical.",
+                "Use AI Clustering to find similar stars nearby."
+            ]
+        
+        return StarAnomalyCheckResponse(
+            star_id=star_id,
+            source_id=star.source_id,
+            is_anomaly=is_anomaly,
+            anomaly_score=anomaly_data["anomaly_score"] if anomaly_data else None,
+            anomaly_rank=anomaly_rank,
+            total_anomalies=len(anomalies),
+            explanation=explanation,
+            feature_deviations=feature_deviations,
+            recommendations=recommendations
+        )
+        
+    except HTTPException:
+        raise
+    except InsufficientDataError as e:
+        logger.warning(f"Insufficient data for anomaly check: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "insufficient_data",
+                "message": str(e),
+                "suggestion": "Load more data using POST /datasets/gaia/load"
+            }
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error in anomaly check: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": f"An unexpected error occurred: {str(e)}"
+            }
+        )

@@ -45,6 +45,9 @@
     display: flex;
     flex-direction: column;
     z-index: 100;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
 }
 
 /* Logo */
@@ -1067,4 +1070,29 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
+}
+
+/* ========================================
+   CLICK HINT & INTERACTIVE ELEMENTS
+   ======================================== */
+.click-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 0.25rem 0.5rem;
+    background: rgba(212, 104, 58, 0.1);
+    border-radius: 4px;
+}
+
+.anomaly-item.clickable {
+    cursor: pointer;
+}
+
+.anomaly-item.clickable:hover {
+    background: rgba(212, 104, 58, 0.12);
+    transform: translateX(4px);
+}
+
+.anomaly-item.clickable:active {
+    transform: translateX(2px);
 }
