@@ -412,3 +412,16 @@ class ApplyMappingRequest(BaseModel):
     dataset_id: str = Field(description="UUID of the dataset")
     mapping: dict = Field(description="Column mapping dict (source_column -> target_column)")
     confidence_threshold: float = Field(default=0.75, description="Minimum confidence to accept", ge=0.0, le=1.0)
+
+
+class ValidateMappingRequest(BaseModel):
+    """Request to validate a column mapping without applying it."""
+    mapping: dict = Field(description="Column mapping dict to validate")
+    min_confidence: float = Field(default=0.75, description="Minimum confidence threshold", ge=0.0, le=1.0)
+
+
+class ValidateMappingResponse(BaseModel):
+    """Response from mapping validation."""
+    is_valid: bool = Field(description="Whether the mapping is valid")
+    issues: List[str] = Field(description="List of validation issues")
+    warnings: List[str] = Field(default=[], description="Non-critical warnings")

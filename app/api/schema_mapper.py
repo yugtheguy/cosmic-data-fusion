@@ -16,7 +16,9 @@ from app.schemas import (
     MappingSuggestionResponse,
     PreviewMappingRequest,
     ApplyMappingRequest,
-    SuggestFromHeadersRequest
+    SuggestFromHeadersRequest,
+    ValidateMappingRequest,
+    ValidateMappingResponse
 )
 from app.services.schema_mapper import SchemaMapper
 
@@ -112,3 +114,35 @@ async def apply_column_mapping(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to apply mapping: {str(e)}")
+
+
+@router.post("/validate", response_model=ValidateMappingResponse)
+async def validate_column_mapping(request: ValidateMappingRequest):
+    """
+    Validate a column mapping without applying it.
+    
+    Checks for:
+    - Required columns (RA, Dec)
+    - Duplicate mappings (multiple sources to same target)
+    - Invalid target columns
+    
+    Args:
+        request: ValidateMappingRequest with mapping to validate
+        
+    Returns:
+        ValidateMappingResponse with validation results
+    """
+    try:
+        mapper = SchemaMapper()
+        is_valid, issues = mapper.validate_mapping_for_ingestion(
+            mapping=request.mapping,
+            min_confidence=request.min_confidence
+        )
+        
+        return ValidateMappingResponse(
+            is_valid=is_valid,
+            issues=issues,
+            warnings=[]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")

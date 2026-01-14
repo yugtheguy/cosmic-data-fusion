@@ -478,11 +478,11 @@ class SchemaMapper:
             if target_col not in valid_targets:
                 raise ValueError(f"Invalid target column: {target_col}")
         
-        # Check required columns are mapped
-        if 'ra' not in mapping.values():
-            raise ValueError("RA column mapping is required")
-        if 'dec' not in mapping.values():
-            raise ValueError("Dec column mapping is required")
+        # Use validation method to check for issues
+        is_valid, issues = self.validate_mapping_for_ingestion(mapping, confidence_threshold)
+        if not is_valid:
+            # Raise an exception with all issues
+            raise ValueError(f"Mapping validation failed: {'; '.join(issues)}")
         
         # Store the mapping as JSON in the column_mappings field
         update_data = {
@@ -539,3 +539,43 @@ class SchemaMapper:
             return ConfidenceLevel.MEDIUM
         else:
             return ConfidenceLevel.LOW
+    
+    def validate_mapping_for_ingestion(
+        self,
+        mapping: Dict[str, str],
+        min_confidence: float = 0.75
+    ) -> Tuple[bool, List[str]]:
+        """
+        Validate that a mapping is suitable for ingestion.
+        
+        Args:
+            mapping: Column mapping dictionary
+            min_confidence: Minimum confidence threshold
+            
+        Returns:
+            Tuple of (is_valid, list_of_issues)
+        """
+        issues = []
+        
+        # Check required columns
+        if 'ra' not in mapping.values():
+            issues.append("CRITICAL: RA (Right Ascension) column is required but not mapped")
+        if 'dec' not in mapping.values():
+            issues.append("CRITICAL: Dec (Declination) column is required but not mapped")
+        
+        # Check for duplicates (multiple source columns mapping to same target)
+        target_counts = {}
+        for source, target in mapping.items():
+            target_counts[target] = target_counts.get(target, 0) + 1
+        
+        duplicates = [target for target, count in target_counts.items() if count > 1]
+        if duplicates:
+            for dup in duplicates:
+                sources = [s for s, t in mapping.items() if t == dup]
+                issues.append(
+                    f"AMBIGUOUS: Multiple columns map to '{dup}': {sources}. "
+                    f"Please select only one."
+                )
+        
+        is_valid = len(issues) == 0
+        return is_valid, issues
