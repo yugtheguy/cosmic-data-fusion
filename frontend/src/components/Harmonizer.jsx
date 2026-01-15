@@ -15,6 +15,7 @@ import {
     Atom
 } from 'lucide-react';
 import { runCrossMatch, getHarmonizationStats, getFusionGroups, getFusionGroup } from '../services/api';
+import toast from 'react-hot-toast';
 import './Harmonizer.css';
 
 // Animated Network Visualization Component
@@ -246,9 +247,12 @@ function Harmonizer() {
         try {
             const result = await runCrossMatch(matchRadius, true);
             setLastRun(result);
+            toast.success(result.message || 'Cross-match completed successfully');
             await loadData(); // Refresh everything
         } catch (err) {
-            setError(err.response?.data?.detail || 'Cross-match failed');
+            const errorMsg = err.response?.data?.detail || 'Cross-match failed';
+            setError(errorMsg);
+            toast.error(errorMsg);
         } finally {
             setLoading(false);
         }

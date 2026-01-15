@@ -21,7 +21,8 @@ import {
     FileText,
     CheckCircle,
     XCircle,
-    AlertCircle
+    AlertCircle,
+    Target
 } from 'lucide-react';
 import {
     searchStars,
@@ -35,17 +36,22 @@ import {
 import SchemaMapper from '../components/SchemaMapper';
 import AILab from '../components/AILab';
 import Harmonizer from '../components/Harmonizer';
+import ResultsTable from '../components/ResultsTable';
 import './Dashboard.css';
 
 // Sidebar Navigation Component
 function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters, isLoading }) {
+    const navigate = useNavigate();
     const navItems = [
         { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+        { id: 'query', icon: Search, label: 'Query Builder' },
+        { id: 'results', icon: Database, label: 'Data Table' },
         { id: 'upload', icon: UploadCloud, label: 'Ingest Data' },
         { id: 'skymap', icon: Map, label: 'Sky Map' },
-        { id: 'anomaly', icon: Brain, label: 'AI Anomaly' },
-        { id: 'harmonize', icon: Link2, label: 'Harmonize' },
+        { id: 'anomaly', icon: Brain, label: 'AI Lab' },
+        { id: 'harmonize', icon: Link2, label: 'Harmonizer' },
         { id: 'export', icon: Download, label: 'Export' },
+        { id: 'planet-hunter', icon: Target, label: 'Planet Hunter', external: true },
     ];
 
     return (
@@ -63,7 +69,15 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
                     <button
                         key={item.id}
                         className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                        onClick={() => setActiveTab(item.id)}
+                        onClick={() => {
+                            if (item.id === 'query') {
+                                navigate('/query');
+                            } else if (item.id === 'planet-hunter') {
+                                navigate('/planet-hunter');
+                            } else {
+                                setActiveTab(item.id);
+                            }
+                        }}
                     >
                         <item.icon size={18} strokeWidth={1.5} />
                         <span>{item.label}</span>
@@ -268,90 +282,144 @@ function StatCard({ icon: Icon, label, value, trend, isLoading }) {
     );
 }
 
-// Sky Map Component
+// Sky Map Component - Enhanced Version
 function SkyMap({ stars, anomalies, isLoading }) {
     const [showAnomalies, setShowAnomalies] = useState(true);
+    const [magRange, setMagRange] = useState([-30, 25]); // Min/max magnitude filter
+    const [visibleCatalogs, setVisibleCatalogs] = useState({
+        'Gaia DR3': true,
+        'SDSS': true,
+        '2MASS': true,
+        'Tycho-2': true,
+        'Other': true
+    });
+    const [mouseCoords, setMouseCoords] = useState({ ra: null, dec: null });
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedRegion, setSelectedRegion] = useState(null);
     const navigate = useNavigate();
+
+    // Catalog color mapping (Orange shades)
+    const catalogColors = {
+        'Gaia DR3': '#d4683a', // Primary orange
+        'SDSS': '#e8a87c',     // Light orange
+        '2MASS': '#ef4444',    // Red (kept for contrast)
+        'Tycho-2': '#f59e0b',  // Amber
+        'Other': '#c2410c'     // Deep burnt orange
+    };
+
+    const getCatalogKey = (source) => {
+        if (!source) return 'Other';
+        const s = source.toLowerCase();
+        if (s.includes('gaia')) return 'Gaia DR3';
+        if (s.includes('sdss')) return 'SDSS';
+        if (s.includes('2mass')) return '2MASS';
+        if (s.includes('tycho')) return 'Tycho-2';
+        return 'Other';
+    };
 
     // Prepare plot data
     const anomalyIds = new Set(anomalies?.map(a => a.id) || []);
 
-    const normalStars = stars?.filter(s => !anomalyIds.has(s.id)) || [];
-    const anomalyStars = stars?.filter(s => anomalyIds.has(s.id)) || [];
+    // Filter stars by magnitude and catalog
+    const filteredStars = (stars || []).filter(s => {
+        const mag = s.brightness_mag || 10;
+        const catalog = getCatalogKey(s.original_source);
+        return mag >= magRange[0] && mag <= magRange[1] && visibleCatalogs[catalog];
+    });
 
-    const plotData = [
-        // Normal stars
-        {
-            type: 'scatter',
-            mode: 'markers',
-            name: 'Stars',
-            x: normalStars.map(s => 360 - (s.ra_deg || 0)),
-            y: normalStars.map(s => s.dec_deg || 0),
-            customdata: normalStars.map(s => s.id),
-            marker: {
-                size: normalStars.map(s => Math.max(3, 12 - (s.brightness_mag || 10))),
-                color: '#e8a87c',
-                opacity: 0.8,
-            },
-            text: normalStars.map(s => `${s.source_id}<br>RA: ${s.ra_deg?.toFixed(2)}°<br>Dec: ${s.dec_deg?.toFixed(2)}°<br>Mag: ${s.brightness_mag?.toFixed(2)}<br><i>Click to view details</i>`),
-            hoverinfo: 'text',
+    const normalStars = filteredStars.filter(s => !anomalyIds.has(s.id));
+    const anomalyStars = filteredStars.filter(s => anomalyIds.has(s.id));
+
+    // Group stars by catalog for separate traces
+    const catalogGroups = {};
+    normalStars.forEach(s => {
+        const catalog = getCatalogKey(s.original_source);
+        if (!catalogGroups[catalog]) catalogGroups[catalog] = [];
+        catalogGroups[catalog].push(s);
+    });
+
+    // Create plot traces for each catalog
+    const plotData = Object.entries(catalogGroups).map(([catalog, catStars]) => ({
+        type: 'scatter',
+        mode: 'markers',
+        name: catalog,
+        x: catStars.map(s => 360 - (s.ra_deg || 0)),
+        y: catStars.map(s => s.dec_deg || 0),
+        customdata: catStars.map(s => s.id),
+        marker: {
+            size: catStars.map(s => Math.max(4, 14 - (s.brightness_mag || 10))),
+            color: catalogColors[catalog],
+            opacity: 0.85,
+            line: { width: 0.5, color: 'rgba(255,255,255,0.3)' }
         },
-        // Anomalies
-        ...(showAnomalies ? [{
+        text: catStars.map(s => `<b>${s.source_id}</b><br>Catalog: ${catalog}<br>RA: ${s.ra_deg?.toFixed(4)}°<br>Dec: ${s.dec_deg?.toFixed(4)}°<br>Mag: ${s.brightness_mag?.toFixed(2)}<br><i>Click to view details</i>`),
+        hoverinfo: 'text',
+    }));
+
+    // Add anomalies trace
+    if (showAnomalies && anomalyStars.length > 0) {
+        plotData.push({
             type: 'scatter',
             mode: 'markers',
-            name: 'Anomalies',
+            name: '⚠️ Anomalies',
             x: anomalyStars.map(s => 360 - (s.ra_deg || 0)),
             y: anomalyStars.map(s => s.dec_deg || 0),
             customdata: anomalyStars.map(s => s.id),
             marker: {
-                size: 12,
-                color: '#d4683a',
+                size: 14,
+                color: '#ff6b6b',
                 symbol: 'diamond',
-                line: { width: 1, color: '#e8a87c' }
+                line: { width: 2, color: '#fff' }
             },
-            text: anomalyStars.map(s => `⚠️ ANOMALY<br>${s.source_id}<br>RA: ${s.ra_deg?.toFixed(2)}°<br>Dec: ${s.dec_deg?.toFixed(2)}°<br><i>Click to view details</i>`),
+            text: anomalyStars.map(s => `<b>⚠️ ANOMALY</b><br>${s.source_id}<br>RA: ${s.ra_deg?.toFixed(4)}°<br>Dec: ${s.dec_deg?.toFixed(4)}°<br><i>Click to investigate</i>`),
             hoverinfo: 'text',
-        }] : []),
-    ];
+        });
+    }
 
     const layout = {
-        paper_bgcolor: 'transparent',
-        plot_bgcolor: 'transparent',
-        font: { color: '#888888', family: 'Inter, sans-serif' },
-        margin: { t: 40, r: 20, b: 50, l: 60 },
+        paper_bgcolor: 'rgba(8, 8, 20, 0.95)',
+        plot_bgcolor: 'rgba(12, 12, 30, 0.9)',
+        font: { color: '#a0a0a0', family: 'Inter, sans-serif' },
+        margin: { t: 30, r: 30, b: 60, l: 70 },
         xaxis: {
-            title: { text: 'Right Ascension (°)', font: { size: 12 } },
+            title: { text: 'Right Ascension (°)', font: { size: 12, color: '#888' } },
             range: [360, 0],
-            gridcolor: 'rgba(42, 42, 42, 0.5)',
-            zerolinecolor: 'rgba(42, 42, 42, 0.5)',
+            gridcolor: 'rgba(60, 60, 80, 0.4)',
+            zerolinecolor: 'rgba(100, 100, 120, 0.5)',
             tickfont: { size: 10 },
+            dtick: 30,
         },
         yaxis: {
-            title: { text: 'Declination (°)', font: { size: 12 } },
+            title: { text: 'Declination (°)', font: { size: 12, color: '#888' } },
             range: [-90, 90],
-            gridcolor: 'rgba(42, 42, 42, 0.5)',
-            zerolinecolor: 'rgba(42, 42, 42, 0.5)',
+            gridcolor: 'rgba(60, 60, 80, 0.4)',
+            zerolinecolor: 'rgba(100, 100, 120, 0.5)',
             tickfont: { size: 10 },
+            dtick: 30,
         },
         showlegend: true,
         legend: {
-            x: 1,
-            y: 1,
-            xanchor: 'right',
-            bgcolor: 'rgba(26, 26, 26, 0.8)',
-            bordercolor: '#2a2a2a',
+            x: 0.01,
+            y: 0.99,
+            xanchor: 'left',
+            yanchor: 'top',
+            bgcolor: 'rgba(20, 20, 35, 0.9)',
+            bordercolor: 'rgba(100, 100, 120, 0.5)',
             borderwidth: 1,
             font: { size: 11 }
         },
-        dragmode: 'zoom',
+        dragmode: selectionMode ? 'select' : 'zoom',
         hovermode: 'closest',
+        // Add subtle background shapes for celestial equator
+        shapes: [
+            { type: 'line', x0: 0, x1: 360, y0: 0, y1: 0, line: { color: 'rgba(100,100,150,0.3)', width: 1, dash: 'dot' } }
+        ],
     };
 
     const config = {
         displayModeBar: true,
         displaylogo: false,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+        modeBarButtonsToRemove: ['lasso2d'],
         responsive: true,
     };
 
@@ -366,27 +434,138 @@ function SkyMap({ stars, anomalies, isLoading }) {
         }
     };
 
+    // Handle hover for coordinate readout
+    const handleHover = (event) => {
+        if (event.points && event.points.length > 0) {
+            const point = event.points[0];
+            setMouseCoords({
+                ra: (360 - point.x).toFixed(4),
+                dec: point.y.toFixed(4)
+            });
+        }
+    };
+
+    // Handle selection
+    const handleSelection = (event) => {
+        if (event.range) {
+            const raMax = 360 - event.range.x[0];
+            const raMin = 360 - event.range.x[1];
+            const decMin = event.range.y[0];
+            const decMax = event.range.y[1];
+            setSelectedRegion({ raMin, raMax, decMin, decMax });
+        }
+    };
+
+    const toggleCatalog = (catalog) => {
+        setVisibleCatalogs(prev => ({ ...prev, [catalog]: !prev[catalog] }));
+    };
+
+    const querySelectedRegion = () => {
+        if (selectedRegion) {
+            navigate(`/query?mode=box&raMin=${selectedRegion.raMin.toFixed(2)}&raMax=${selectedRegion.raMax.toFixed(2)}&decMin=${selectedRegion.decMin.toFixed(2)}&decMax=${selectedRegion.decMax.toFixed(2)}`);
+        }
+    };
+
     return (
-        <div className="skymap-container">
+        <div className="skymap-container enhanced">
+            {/* Header */}
             <div className="skymap-header">
-                <h2>Interactive Sky Map</h2>
-                <div className="skymap-controls">
-                    <span className="click-hint">Click on any star to view details</span>
+                <div className="skymap-title-section">
+                    <h2>🌌 Interactive Sky Map</h2>
+                    <div className="skymap-stats">
+                        <span className="stat-badge">{filteredStars.length.toLocaleString()} stars visible</span>
+                        {anomalyStars.length > 0 && <span className="stat-badge anomaly">{anomalyStars.length} anomalies</span>}
+                    </div>
+                </div>
+
+                {/* Coordinate Readout */}
+                <div className="coord-readout">
+                    <span className="coord-label">RA:</span>
+                    <span className="coord-value">{mouseCoords.ra || '—'}°</span>
+                    <span className="coord-label">Dec:</span>
+                    <span className="coord-value">{mouseCoords.dec || '—'}°</span>
+                </div>
+            </div>
+
+            {/* Controls Panel */}
+            <div className="skymap-controls-panel">
+                {/* Catalog Toggles */}
+                <div className="control-group">
+                    <label className="control-label">Catalogs</label>
+                    <div className="catalog-toggles">
+                        {Object.keys(catalogColors).map(cat => (
+                            <button
+                                key={cat}
+                                className={`catalog-btn ${visibleCatalogs[cat] ? 'active' : ''}`}
+                                style={{ '--cat-color': catalogColors[cat] }}
+                                onClick={() => toggleCatalog(cat)}
+                            >
+                                <span className="cat-dot"></span>
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Magnitude Filter */}
+                <div className="control-group">
+                    <label className="control-label">Magnitude: {magRange[0]} to {magRange[1]}</label>
+                    <div className="mag-slider-container">
+                        <input
+                            type="range"
+                            min="-5"
+                            max="20"
+                            value={magRange[1]}
+                            onChange={(e) => setMagRange([magRange[0], parseInt(e.target.value)])}
+                            className="mag-slider"
+                        />
+                    </div>
+                </div>
+
+                {/* Mode Toggles */}
+                <div className="control-group inline">
                     <label className="toggle-label">
                         <input
                             type="checkbox"
                             checked={showAnomalies}
                             onChange={(e) => setShowAnomalies(e.target.checked)}
                         />
-                        <span>Show Anomalies</span>
+                        <span>Anomalies</span>
                     </label>
+                    <button
+                        className={`selection-btn ${selectionMode ? 'active' : ''}`}
+                        onClick={() => setSelectionMode(!selectionMode)}
+                    >
+                        {selectionMode ? '✓ Selection Mode' : '☐ Select Region'}
+                    </button>
                 </div>
             </div>
+
+            {/* Selection Popup */}
+            {selectedRegion && (
+                <div className="selection-popup">
+                    <div className="selection-info">
+                        <strong>Selected Region:</strong><br />
+                        RA: {selectedRegion.raMin.toFixed(2)}° – {selectedRegion.raMax.toFixed(2)}°<br />
+                        Dec: {selectedRegion.decMin.toFixed(2)}° – {selectedRegion.decMax.toFixed(2)}°
+                    </div>
+                    <div className="selection-actions">
+                        <button className="query-btn" onClick={querySelectedRegion}>
+                            Query This Region
+                        </button>
+                        <button className="clear-btn" onClick={() => setSelectedRegion(null)}>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Plot */}
             <div className="skymap-plot">
                 {isLoading ? (
                     <div className="skymap-loading">
-                        <RefreshCw size={24} className="spin" />
-                        <span>Loading star data...</span>
+                        <RefreshCw size={32} className="spin" />
+                        <span>Loading celestial data...</span>
                     </div>
                 ) : (
                     <Plot
@@ -396,6 +575,8 @@ function SkyMap({ stars, anomalies, isLoading }) {
                         style={{ width: '100%', height: '100%' }}
                         useResizeHandler={true}
                         onClick={handlePlotClick}
+                        onHover={handleHover}
+                        onSelected={handleSelection}
                     />
                 )}
             </div>
@@ -855,6 +1036,16 @@ function Dashboard() {
                         <AlertTriangle size={18} />
                         <span>{error}</span>
                         <button onClick={() => window.location.reload()}>Retry</button>
+                    </div>
+                ) : activeTab === 'results' ? (
+                    <div style={{ padding: '1.5rem' }}>
+                        <ResultsTable
+                            data={stars}
+                            isLoading={isLoading}
+                            title="Stellar Catalog"
+                            highlightAnomalies={true}
+                            anomalyIds={anomalies.map(a => a.id)}
+                        />
                     </div>
                 ) : activeTab === 'upload' ? (
                     <UploadView setActiveTab={setActiveTab} />

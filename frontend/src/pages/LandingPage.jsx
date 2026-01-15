@@ -165,45 +165,20 @@ function Scene({ isTransitioning, onCameraComplete }) {
     );
 }
 
-// Cloud Transition Component
-function CloudTransition({ isActive, onComplete }) {
-    return (
-        <div className={`cloud-transition ${isActive ? 'active' : ''}`}>
-            <div className="cloud cloud-1"></div>
-            <div className="cloud cloud-2"></div>
-            <div className="cloud cloud-3"></div>
-            <div className="cloud cloud-4"></div>
-            <div className="cloud cloud-5"></div>
-            <div className="cloud-center">
-                <div className="loading-ring"></div>
-                <span className="loading-text">Entering Atmosphere...</span>
-            </div>
-        </div>
-    );
-}
-
 // Main Landing Page Component
 function LandingPage() {
     const [isTransitioning, setIsTransitioning] = useState(false);
-    const [showClouds, setShowClouds] = useState(false);
     const [textExiting, setTextExiting] = useState(false);
     const navigate = useNavigate();
 
     const handleEnterClick = () => {
         setIsTransitioning(true);
         setTextExiting(true);
-
-        // Show clouds overlay after a delay
-        setTimeout(() => {
-            setShowClouds(true);
-        }, 1500);
     };
 
     const handleCameraComplete = () => {
-        // Navigate after cloud transition is visible
-        setTimeout(() => {
-            navigate('/login');
-        }, 800);
+        // Navigate directly after camera animation
+        navigate('/login');
     };
 
     return (
@@ -241,9 +216,6 @@ function LandingPage() {
                     </svg>
                 </button>
             </div>
-
-            {/* Cloud Transition Overlay */}
-            <CloudTransition isActive={showClouds} onComplete={handleCameraComplete} />
         </div>
     );
 }

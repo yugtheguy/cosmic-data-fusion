@@ -111,11 +111,9 @@ class StarCatalogRepository:
             
         Returns:
             List of matching stars
-            
-        Note:
-            If ra_max < ra_min, assumes wraparound at RA=0°/360°.
-            Query is split into [ra_min, 360] ∪ [0, ra_max].
         """
+        results = []
+
         # Check for RA wraparound (e.g., ra_min=350, ra_max=10)
         if ra_max < ra_min:
             logger.info(
@@ -159,6 +157,7 @@ class StarCatalogRepository:
             ).limit(limit)
             
             results = query.all()
+            
             logger.debug(
                 f"Bounding box search: RA[{ra_min:.2f}, {ra_max:.2f}], "
                 f"Dec[{dec_min:.2f}, {dec_max:.2f}] -> {len(results)} results"

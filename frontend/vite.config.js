@@ -34,7 +34,15 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true
       },
-      '/query': {
+      '/query/search': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/query/export': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/query/sources': {
         target: 'http://localhost:8000',
         changeOrigin: true
       },
