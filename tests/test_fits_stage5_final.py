@@ -12,29 +12,15 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi.testclient import TestClient
-from app.main import app
-from app.database import SessionLocal, Base, engine
 from app.models import UnifiedStarCatalog
 
-client = TestClient(app)
 TEST_DATA_DIR = Path(__file__).parent.parent / "app" / "data"
 
 
 class TestStage5APIIntegration:
     """Stage 5: API Integration - Pragmatic Tests"""
 
-    @classmethod
-    def setup_class(cls):
-        """Setup clean database"""
-        print("\n" + "="*70)
-        print("STAGE 5: API INTEGRATION - FINAL VERIFICATION")
-        print("="*70)
-        Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
-        print("[OK] Clean database initialized")
-
-    def test_01_api_health(self):
+    def test_01_api_health(self, client):
         """Verify API is running and healthy"""
         print("\nTest 1: API Health Check")
         response = client.get("/health")
@@ -43,7 +29,7 @@ class TestStage5APIIntegration:
         assert data["status"] == "healthy"
         print(f"  [OK] API healthy: {data['service']}")
 
-    def test_02_fits_hipparcos_ingestion(self):
+    def test_02_fits_hipparcos_ingestion(self, client, db_session):
         """Test Hipparcos FITS file ingestion via API"""
         print("\nTest 2: Hipparcos FITS Ingestion")
         
@@ -64,14 +50,12 @@ class TestStage5APIIntegration:
         print(f"  [OK] Ingested 50 records, dataset_id={dataset_id}")
         
         # Verify in database
-        db = SessionLocal()
-        count = db.query(UnifiedStarCatalog).filter_by(dataset_id=dataset_id).count()
-        db.close()
+        count = db_session.query(UnifiedStarCatalog).filter_by(dataset_id=dataset_id).count()
         
         assert count == 50
         print(f"  [OK] Database verification: 50 records present")
 
-    def test_03_fits_2mass_ingestion(self):
+    def test_03_fits_2mass_ingestion(self, client):
         """Test 2MASS FITS file ingestion"""
         print("\nTest 3: 2MASS FITS Ingestion")
         
@@ -89,16 +73,15 @@ class TestStage5APIIntegration:
         
         print(f"  [OK] Ingested 50 2MASS records, dataset_id={result['dataset_id']}")
 
-    def test_04_multi_dataset_verification(self):
+    def test_04_multi_dataset_verification(self, db_session):
         """Verify multiple datasets are properly stored"""
         print("\nTest 4: Multi-Dataset Storage Verification")
         
-        db = SessionLocal()
-        total = db.query(UnifiedStarCatalog).count()
-        datasets = db.query(UnifiedStarCatalog.dataset_id).distinct().count()
+        total = db_session.query(UnifiedStarCatalog).count()
+        datasets = db_session.query(UnifiedStarCatalog.dataset_id).distinct().count()
         
         # Get sample records
-        sample_records = db.query(UnifiedStarCatalog).limit(3).all()
+        sample_records = db_session.query(UnifiedStarCatalog).limit(3).all()
         print(f"  Total records: {total}")
         print(f"  Unique datasets: {datasets}")
         
@@ -106,54 +89,45 @@ class TestStage5APIIntegration:
             print(f"    - {rec.object_id}: RA={rec.ra_deg:.2f}, "
                   f"Dec={rec.dec_deg:.2f}, Mag={rec.brightness_mag:.2f}")
         
-        db.close()
-        
         assert total >= 100
         assert datasets >= 2
         print(f"  [OK] Multi-dataset storage verified")
 
-    def test_05_coordinate_validation(self):
+    def test_05_coordinate_validation(self, db_session):
         """Verify coordinates are properly stored and valid"""
         print("\nTest 5: Coordinate Validation")
         
-        db = SessionLocal()
-        records = db.query(UnifiedStarCatalog).limit(10).all()
+        records = db_session.query(UnifiedStarCatalog).limit(10).all()
         
         for rec in records:
             assert -360 <= rec.ra_deg <= 360, f"Invalid RA: {rec.ra_deg}"
             assert -90 <= rec.dec_deg <= 90, f"Invalid Dec: {rec.dec_deg}"
             assert rec.brightness_mag is not None, "Missing magnitude"
         
-        db.close()
         print(f"  [OK] All {len(records)} sampled records have valid coordinates")
 
-    def test_06_magnitude_filtering(self):
+    def test_06_magnitude_filtering(self, db_session):
         """Verify magnitude data is usable for filtering"""
         print("\nTest 6: Magnitude Filtering")
         
-        db = SessionLocal()
-        
-        bright_stars = db.query(UnifiedStarCatalog).filter(
+        bright_stars = db_session.query(UnifiedStarCatalog).filter(
             UnifiedStarCatalog.brightness_mag <= 8.0
         ).all()
         
-        faint_stars = db.query(UnifiedStarCatalog).filter(
+        faint_stars = db_session.query(UnifiedStarCatalog).filter(
             UnifiedStarCatalog.brightness_mag > 8.0
         ).all()
         
         print(f"  Bright stars (mag <= 8.0): {len(bright_stars)}")
         print(f"  Faint stars (mag > 8.0): {len(faint_stars)}")
         
-        db.close()
         print(f"  [OK] Magnitude filtering works")
 
-    def test_07_distance_data(self):
+    def test_07_distance_data(self, db_session):
         """Verify distance data is properly computed from parallax"""
         print("\nTest 7: Distance Data Verification")
         
-        db = SessionLocal()
-        
-        records_with_distance = db.query(UnifiedStarCatalog).filter(
+        records_with_distance = db_session.query(UnifiedStarCatalog).filter(
             UnifiedStarCatalog.distance_pc is not None
         ).limit(5).all()
         
@@ -167,15 +141,13 @@ class TestStage5APIIntegration:
                 assert error < 0.01, f"Distance calculation error: {error*100:.2f}%"
                 print(f"    Parallax={rec.parallax_mas:.2f} mas -> Distance={actual_dist:.2f} pc [OK]")
         
-        db.close()
         print(f"  [OK] Distance conversions accurate")
 
-    def test_08_metadata_preservation(self):
+    def test_08_metadata_preservation(self, db_session):
         """Verify raw metadata is preserved in JSON field"""
         print("\nTest 8: Metadata Preservation")
         
-        db = SessionLocal()
-        records_with_metadata = db.query(UnifiedStarCatalog).filter(
+        records_with_metadata = db_session.query(UnifiedStarCatalog).filter(
             UnifiedStarCatalog.raw_metadata is not None
         ).limit(3).all()
         
@@ -185,10 +157,9 @@ class TestStage5APIIntegration:
             if rec.raw_metadata:
                 print(f"    Metadata keys: {list(rec.raw_metadata.keys())}")
         
-        db.close()
         print(f"  [OK] Metadata preserved in database")
 
-    def test_09_error_handling(self):
+    def test_09_error_handling(self, client):
         """Verify API handles invalid files gracefully"""
         print("\nTest 9: Error Handling")
         
@@ -199,7 +170,7 @@ class TestStage5APIIntegration:
         assert response.status_code != 200
         print(f"  [OK] Invalid file rejected (status={response.status_code})")
 
-    def test_10_api_response_format(self):
+    def test_10_api_response_format(self, client):
         """Verify API response structure is consistent"""
         print("\nTest 10: API Response Format Validation")
         

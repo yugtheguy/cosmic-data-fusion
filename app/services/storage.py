@@ -12,8 +12,14 @@ from datetime import datetime, timezone
 from typing import Optional, BinaryIO
 from pathlib import Path
 
-from minio import Minio
-from minio.error import S3Error
+try:
+    from minio import Minio
+    from minio.error import S3Error
+    MINIO_AVAILABLE = True
+except ImportError:
+    MINIO_AVAILABLE = False
+    Minio = None
+    S3Error = Exception
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +93,12 @@ class StorageService:
         Args:
             config: StorageConfiguration instance (uses defaults if None)
         """
+        if not MINIO_AVAILABLE:
+            logger.warning("MinIO not available - storage service disabled")
+            self.config = None
+            self.client = None
+            return
+            
         self.config = config or StorageConfiguration()
         
         # Initialize MinIO client
@@ -107,6 +119,9 @@ class StorageService:
     
     def _ensure_bucket_exists(self):
         """Create bucket if it doesn't exist."""
+        if not self.client:
+            return
+            
         try:
             if not self.client.bucket_exists(self.config.bucket):
                 self.client.make_bucket(self.config.bucket)

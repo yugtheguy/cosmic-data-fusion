@@ -8,7 +8,7 @@ frame at J2000 epoch - the modern standard for astronomical catalogs.
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, Index, JSON, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, Index, JSON, Text, Boolean
 
 from app.database import Base
 
@@ -280,4 +280,79 @@ class IngestionError(Base):
             f"<IngestionError(id={self.id}, dataset_id='{self.dataset_id}', "
             f"type='{self.error_type}', severity='{self.severity}', "
             f"message='{self.message[:50]}...')>"
+        )
+
+
+class DiscoveryRun(Base):
+    """
+    Store AI discovery computation results and metadata.
+    
+    Tracks individual discovery runs (anomaly detection or clustering)
+    with parameters, filters, and summary statistics. Enables:
+    - Comparison of results over time
+    - Tracking different parameter configurations
+    - Reusing expensive computations
+    - Historical trend analysis
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        run_id: Unique UUID identifier for this discovery run
+        run_type: Type of discovery ('anomaly' or 'cluster')
+        parameters: JSON with algorithm parameters (contamination, eps, etc.)
+        dataset_filter: JSON with query filters used to select stars
+        total_stars: Number of stars analyzed in this run
+        results_summary: JSON with statistics (n_anomalies, n_clusters, etc.)
+        created_at: Timestamp when run was created
+    """
+    __tablename__ = "discovery_runs"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    run_id = Column(String(36), unique=True, index=True, nullable=False, default=lambda: str(uuid4()))
+    run_type = Column(String(20), nullable=False, index=True)  # 'anomaly' or 'cluster'
+    parameters = Column(JSON, nullable=False)  # Algorithm parameters
+    dataset_filter = Column(JSON, nullable=True)  # Query filters used
+    total_stars = Column(Integer, nullable=False)
+    results_summary = Column(JSON, nullable=False)  # Stats summary
+    is_complete = Column(Boolean, default=False, nullable=False)  # True when all results are saved
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    
+    def __repr__(self) -> str:
+        return (
+            f"<DiscoveryRun(run_id='{self.run_id}', type='{self.run_type}', "
+            f"stars={self.total_stars})>"
+        )
+
+
+class DiscoveryResult(Base):
+    """
+    Individual star discovery results linked to a discovery run.
+    
+    Stores per-star results from AI discovery algorithms:
+    - Anomaly scores and classifications
+    - Cluster assignments
+    - Links back to parent DiscoveryRun
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        run_id: Foreign key to DiscoveryRun.run_id
+        star_id: Foreign key to UnifiedStarCatalog.id
+        is_anomaly: Boolean flag if star is classified as anomaly
+        anomaly_score: Anomaly score from IsolationForest (-1 to +1)
+        cluster_id: Cluster assignment from DBSCAN (-1 for noise)
+        created_at: Timestamp when result was stored
+    """
+    __tablename__ = "discovery_results"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    run_id = Column(String(36), nullable=False, index=True)  # FK to discovery_runs.run_id
+    star_id = Column(Integer, nullable=False, index=True)  # FK to unified_star_catalog.id
+    is_anomaly = Column(Integer, default=0, nullable=False, index=True)  # 0/1 for boolean
+    anomaly_score = Column(Float, nullable=True)  # -1 to +1 range
+    cluster_id = Column(Integer, nullable=True, index=True)  # -1 for noise, 0+ for clusters
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    
+    def __repr__(self) -> str:
+        return (
+            f"<DiscoveryResult(run_id='{self.run_id}', star={self.star_id}, "
+            f"anomaly={bool(self.is_anomaly)})>"
         )

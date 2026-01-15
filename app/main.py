@@ -93,6 +93,7 @@ app.include_router(search.router)
 app.include_router(datasets.router)
 app.include_router(visualize.router)
 app.include_router(ai.router)  # AI Discovery endpoints (Phase 5)
+app.include_router(analytics.router)  # Analytics & Materialized Views (Layer 4 Enhancement)
 app.include_router(query.router)  # Query & Export endpoints (Phase 3)
 app.include_router(harmonize.router)  # Harmonization endpoints (Phase 2)
 app.include_router(schema_mapper.router)  # Schema Mapper endpoints
