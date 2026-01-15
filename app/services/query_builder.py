@@ -15,6 +15,7 @@ from typing import Optional
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session, Query
+from sqlalchemy import or_
 
 from app.models import UnifiedStarCatalog
 
@@ -47,6 +48,8 @@ class QueryFilters:
     max_mag: Optional[float] = None
     min_parallax: Optional[float] = None
     max_parallax: Optional[float] = None
+    min_distance: Optional[float] = None
+    max_distance: Optional[float] = None
     ra_min: Optional[float] = None
     ra_max: Optional[float] = None
     dec_min: Optional[float] = None
@@ -137,15 +140,54 @@ class QueryBuilder:
             filters_applied.append(f"parallax <= {filters.max_parallax} mas")
         
         # =====================================================================
+        # DISTANCE FILTERS
+        # Distance (pc) = 1000 / parallax (mas)
+        # min_distance → parallax <= 1000/min_distance (closer stars have higher parallax)
+        # max_distance → parallax >= 1000/max_distance (farther stars have lower parallax)
+        # =====================================================================
+        if filters.min_distance is not None and filters.min_distance > 0:
+            # Closer than min_distance: parallax > 1000/min_distance
+            # But we want FARTHER, so parallax <= 1000/min_distance
+            max_parallax_from_distance = 1000.0 / filters.min_distance
+            query = query.filter(UnifiedStarCatalog.parallax_mas <= max_parallax_from_distance)
+            filters_applied.append(f"distance >= {filters.min_distance} pc (parallax <= {max_parallax_from_distance:.2f} mas)")
+        
+        if filters.max_distance is not None and filters.max_distance > 0:
+            # Farther than max_distance: parallax < 1000/max_distance
+            # But we want CLOSER, so parallax >= 1000/max_distance
+            min_parallax_from_distance = 1000.0 / filters.max_distance
+            query = query.filter(UnifiedStarCatalog.parallax_mas >= min_parallax_from_distance)
+            filters_applied.append(f"distance <= {filters.max_distance} pc (parallax >= {min_parallax_from_distance:.2f} mas)")
+        
+        # =====================================================================
         # SPATIAL FILTERS (Bounding Box)
         # RA: Right Ascension [0, 360) degrees
         # Dec: Declination [-90, +90] degrees
+        # 
+        # SPECIAL CASE: RA Wraparound
+        # If ra_min > ra_max (e.g., 350° to 10°), the search crosses 0°/360°.
+        # Use OR logic: (ra >= ra_min) OR (ra <= ra_max)
         # =====================================================================
-        if filters.ra_min is not None:
+        if filters.ra_min is not None and filters.ra_max is not None:
+            if filters.ra_min > filters.ra_max:
+                # RA wraparound case (e.g., 350° to 10°)
+                query = query.filter(
+                    or_(
+                        UnifiedStarCatalog.ra_deg >= filters.ra_min,
+                        UnifiedStarCatalog.ra_deg <= filters.ra_max
+                    )
+                )
+                filters_applied.append(f"RA wrap {filters.ra_min}° to {filters.ra_max}° (crosses 0°)")
+            else:
+                # Normal case
+                query = query.filter(UnifiedStarCatalog.ra_deg >= filters.ra_min)
+                query = query.filter(UnifiedStarCatalog.ra_deg <= filters.ra_max)
+                filters_applied.append(f"RA >= {filters.ra_min}°")
+                filters_applied.append(f"RA <= {filters.ra_max}°")
+        elif filters.ra_min is not None:
             query = query.filter(UnifiedStarCatalog.ra_deg >= filters.ra_min)
             filters_applied.append(f"RA >= {filters.ra_min}°")
-        
-        if filters.ra_max is not None:
+        elif filters.ra_max is not None:
             query = query.filter(UnifiedStarCatalog.ra_deg <= filters.ra_max)
             filters_applied.append(f"RA <= {filters.ra_max}°")
         

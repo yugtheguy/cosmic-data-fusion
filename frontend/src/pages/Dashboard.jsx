@@ -21,7 +21,8 @@ import {
     FileText,
     CheckCircle,
     XCircle,
-    AlertCircle
+    AlertCircle,
+    Target
 } from 'lucide-react';
 import {
     searchStars,
@@ -50,6 +51,7 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
         { id: 'anomaly', icon: Brain, label: 'AI Lab' },
         { id: 'harmonize', icon: Link2, label: 'Harmonizer' },
         { id: 'export', icon: Download, label: 'Export' },
+        { id: 'planet-hunter', icon: Target, label: 'Planet Hunter', external: true },
     ];
 
     return (
@@ -70,6 +72,8 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
                         onClick={() => {
                             if (item.id === 'query') {
                                 navigate('/query');
+                            } else if (item.id === 'planet-hunter') {
+                                navigate('/planet-hunter');
                             } else {
                                 setActiveTab(item.id);
                             }

@@ -31,9 +31,8 @@ router = APIRouter(prefix="/search", tags=["Search"])
 
 @router.get(
     "/box",
-    response_model=SearchResponse,
     summary="Bounding box search",
-    description="Search stars within a rectangular RA/Dec region."
+    description="Search stars within a rectangular RA/Dec region. Returns standardized response format."
 )
 def search_bounding_box(
     ra_min: float = Query(
@@ -57,7 +56,7 @@ def search_bounding_box(
         description="Maximum results to return"
     ),
     db: Session = Depends(get_db)
-) -> SearchResponse:
+):
     """
     Search stars within a bounding box.
     
@@ -83,12 +82,7 @@ def search_bounding_box(
         HTTPException 400: Invalid parameter ranges
         HTTPException 500: Database error
     """
-    # Validate ranges
-    if ra_min > ra_max:
-        raise HTTPException(
-            status_code=400,
-            detail="ra_min must be less than or equal to ra_max"
-        )
+    # Validate dec ranges (RA wraparound is allowed for ra_min > ra_max)
     if dec_min > dec_max:
         raise HTTPException(
             status_code=400,
@@ -105,14 +99,27 @@ def search_bounding_box(
             limit=limit
         )
         
-        star_responses = [
-            StarResponse.model_validate(star) for star in stars
-        ]
+        # Convert to StarRecord format
+        from app.api.query import StarRecord
+        records = []
+        for star in stars:
+            records.append(StarRecord(
+                id=star.id,
+                source_id=star.source_id,
+                ra_deg=star.ra_deg,
+                dec_deg=star.dec_deg,
+                brightness_mag=star.brightness_mag,
+                parallax_mas=star.parallax_mas,
+                distance_pc=star.distance_pc,
+                original_source=star.original_source
+            ))
         
-        return SearchResponse(
-            count=len(star_responses),
-            stars=star_responses
-        )
+        # Return standardized format
+        return {
+            "success": True,
+            "total_count": len(records),
+            "records": records
+        }
         
     except SQLAlchemyError as e:
         logger.error(f"Database error during bounding box search: {e}")
@@ -124,9 +131,8 @@ def search_bounding_box(
 
 @router.get(
     "/cone",
-    response_model=SearchResponse,
     summary="Cone search",
-    description="Search stars within a circular region using proper spherical geometry."
+    description="Search stars within a circular region using proper spherical geometry. Returns standardized response format."
 )
 def search_cone(
     ra: float = Query(
@@ -146,7 +152,7 @@ def search_cone(
         description="Maximum results to return"
     ),
     db: Session = Depends(get_db)
-) -> SearchResponse:
+):
     """
     Search stars within a cone (circular region).
     
@@ -183,14 +189,27 @@ def search_cone(
             limit=limit
         )
         
-        star_responses = [
-            StarResponse.model_validate(star) for star in stars
-        ]
+        # Convert to StarResponse format
+        from app.api.query import StarRecord
+        records = []
+        for star in stars:
+            records.append(StarRecord(
+                id=star.id,
+                source_id=star.source_id,
+                ra_deg=star.ra_deg,
+                dec_deg=star.dec_deg,
+                brightness_mag=star.brightness_mag,
+                parallax_mas=star.parallax_mas,
+                distance_pc=star.distance_pc,
+                original_source=star.original_source
+            ))
         
-        return SearchResponse(
-            count=len(star_responses),
-            stars=star_responses
-        )
+        # Return standardized format
+        return {
+            "success": True,
+            "total_count": len(records),
+            "records": records
+        }
         
     except SQLAlchemyError as e:
         logger.error(f"Database error during cone search: {e}")

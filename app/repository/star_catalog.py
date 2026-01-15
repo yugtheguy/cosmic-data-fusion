@@ -151,6 +151,20 @@ class StarCatalogRepository:
             )
         else:
             # Normal case: no wraparound
+        """
+        from sqlalchemy import or_
+        
+        # Handle RA wraparound (e.g., 350° to 10° crosses 0°)
+        if ra_min > ra_max:
+            query = self.db.query(UnifiedStarCatalog).filter(
+                or_(
+                    UnifiedStarCatalog.ra_deg >= ra_min,
+                    UnifiedStarCatalog.ra_deg <= ra_max
+                ),
+                UnifiedStarCatalog.dec_deg >= dec_min,
+                UnifiedStarCatalog.dec_deg <= dec_max
+            ).limit(limit)
+        else:
             query = self.db.query(UnifiedStarCatalog).filter(
                 UnifiedStarCatalog.ra_deg >= ra_min,
                 UnifiedStarCatalog.ra_deg <= ra_max,

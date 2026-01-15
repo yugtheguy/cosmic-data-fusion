@@ -73,6 +73,18 @@ class FilterParams(BaseModel):
         description="Maximum parallax in milliarcseconds.",
         examples=[100.0, 1000.0]
     )
+    min_distance: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description="Minimum distance in parsecs (farther limit). Distance = 1000/parallax.",
+        examples=[10.0, 100.0]
+    )
+    max_distance: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description="Maximum distance in parsecs (closer limit). Distance = 1000/parallax.",
+        examples=[50.0, 500.0]
+    )
     ra_min: Optional[float] = Field(
         default=None,
         ge=0,
@@ -155,9 +167,14 @@ Search the unified star catalog with optional filters.
 
 **Available Filters:**
 - **Magnitude**: `min_mag`, `max_mag` (brightness range)
-- **Parallax**: `min_parallax`, `max_parallax` (distance proxy)
+- **Parallax**: `min_parallax`, `max_parallax` (distance proxy in mas)
+- **Distance**: `min_distance`, `max_distance` (parsecs, computed from parallax)
 - **Position**: `ra_min`, `ra_max`, `dec_min`, `dec_max` (bounding box)
 - **Source**: `original_source` (filter by catalog, e.g., "Gaia DR3")
+
+**Special Handling:**
+- **RA Wraparound**: If `ra_min` > `ra_max` (e.g., 350° to 10°), automatically handles crossing 0°/360°
+- **Distance Conversion**: Distance filters are converted to parallax constraints (distance = 1000/parallax)
 
 **Pagination:**
 - `limit`: Max results per page (default 1000, max 10000)
@@ -166,8 +183,8 @@ Search the unified star catalog with optional filters.
 **Example Use Cases:**
 1. Find bright stars: `{"max_mag": 5.0}`
 2. Northern hemisphere: `{"dec_min": 0.0}`
-3. Gaia stars only: `{"original_source": "Gaia DR3"}`
-4. Combined: `{"min_mag": 2.0, "max_mag": 8.0, "dec_min": -45, "dec_max": 45}`
+3. Stars within 100pc: `{"max_distance": 100.0}`
+4. RA wraparound: `{"ra_min": 350.0, "ra_max": 10.0}`
     """
 )
 async def search_stars(
@@ -189,6 +206,8 @@ async def search_stars(
             max_mag=filters.max_mag,
             min_parallax=filters.min_parallax,
             max_parallax=filters.max_parallax,
+            min_distance=filters.min_distance,
+            max_distance=filters.max_distance,
             ra_min=filters.ra_min,
             ra_max=filters.ra_max,
             dec_min=filters.dec_min,

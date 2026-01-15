@@ -88,6 +88,30 @@ function QueryBuilder() {
         });
     };
 
+    const handleExport = (format = 'csv') => {
+        // Build query string from current filters
+        const params = new URLSearchParams();
+        
+        if (filters.magMin !== '' && filters.magMin !== -26) params.append('min_mag', filters.magMin);
+        if (filters.magMax !== '' && filters.magMax !== 20) params.append('max_mag', filters.magMax);
+        if (filters.parallaxMin !== '') params.append('min_parallax', filters.parallaxMin);
+        if (filters.parallaxMax !== '') params.append('max_parallax', filters.parallaxMax);
+        if (filters.distanceMin !== '') params.append('min_distance', filters.distanceMin);
+        if (filters.distanceMax !== '') params.append('max_distance', filters.distanceMax);
+        if (filters.raMin !== '') params.append('ra_min', filters.raMin);
+        if (filters.raMax !== '') params.append('ra_max', filters.raMax);
+        if (filters.decMin !== '') params.append('dec_min', filters.decMin);
+        if (filters.decMax !== '') params.append('dec_max', filters.decMax);
+        if (filters.catalog.length > 0) params.append('original_source', filters.catalog[0]);
+        params.append('limit', filters.limit);
+        params.append('format', format);
+        
+        // Trigger download
+        const url = `http://localhost:8000/query/export?${params.toString()}`;
+        window.open(url, '_blank');
+        toast.success(`Exporting ${filters.limit} records as ${format.toUpperCase()}`);
+    };
+
     const executeQuery = async () => {
         setIsLoading(true);
         const startTime = performance.now();
@@ -125,6 +149,10 @@ function QueryBuilder() {
                 const params = {
                     min_mag: filters.magMin === '' ? undefined : parseFloat(filters.magMin),
                     max_mag: filters.magMax === '' ? undefined : parseFloat(filters.magMax),
+                    min_parallax: filters.parallaxMin === '' ? undefined : parseFloat(filters.parallaxMin),
+                    max_parallax: filters.parallaxMax === '' ? undefined : parseFloat(filters.parallaxMax),
+                    min_distance: filters.distanceMin === '' ? undefined : parseFloat(filters.distanceMin),
+                    max_distance: filters.distanceMax === '' ? undefined : parseFloat(filters.distanceMax),
                     limit: parseInt(filters.limit)
                 };
 
@@ -136,21 +164,15 @@ function QueryBuilder() {
                 data = await searchStars(params);
             }
 
-            // Transform data based on endpoint response structure
-            // /query/search returns { records: [...], total_count: N }
-            // /search/box and /search/cone return { stars: [...], count: N }
+            // All endpoints now return standardized format: { records: [...], total_count: N }
             if (data && data.records && data.records.length > 0) {
                 setResults(data.records);
                 setTotalResults(data.total_count || data.records.length);
-            } else if (data && data.stars && data.stars.length > 0) {
-                setResults(data.stars);
-                setTotalResults(data.count || data.stars.length);
-            } else if (Array.isArray(data) && data.length > 0) {
-                setResults(data);
-                setTotalResults(data.length);
+                toast.success(`Found ${data.total_count || data.records.length} objects`);
             } else {
                 setResults([]);
                 setTotalResults(0);
+                toast.info('No results found for the given criteria');
             }
 
         } catch (err) {
@@ -432,8 +454,8 @@ function QueryBuilder() {
                                     <button className="toolbar-btn">
                                         <Save size={16} /> Save Query
                                     </button>
-                                    <button className="toolbar-btn primary">
-                                        <Download size={16} /> Export
+                                    <button className="toolbar-btn primary" onClick={() => handleExport('csv')}>
+                                        <Download size={16} /> Export CSV
                                     </button>
                                 </div>
                             </div>
