@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.database import init_db
-from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors
+from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors, analytics
 
 # Configure logging
 logging.basicConfig(

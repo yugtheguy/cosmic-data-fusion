@@ -1,6 +1,0 @@
-
---- Match Found ---
-Source ID: 66714384142368256
-Magnitude: 2.896131992340088
-Parallax: -- (Masked: True)
-Distance (gspphot): -- (Masked: True)
