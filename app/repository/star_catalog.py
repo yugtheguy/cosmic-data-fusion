@@ -100,6 +100,7 @@ class StarCatalogRepository:
         Search stars within a rectangular bounding box.
         
         Uses the composite (ra_deg, dec_deg) index for efficiency.
+        Handles RA wrap-around at 0°/360° boundary.
         
         Args:
             ra_min: Minimum RA in degrees
@@ -110,17 +111,26 @@ class StarCatalogRepository:
             
         Returns:
             List of matching stars
-            
-        Note:
-            Does NOT handle RA wrap-around at 0°/360° boundary.
-            For queries crossing RA=0°, split into two queries.
         """
-        query = self.db.query(UnifiedStarCatalog).filter(
-            UnifiedStarCatalog.ra_deg >= ra_min,
-            UnifiedStarCatalog.ra_deg <= ra_max,
-            UnifiedStarCatalog.dec_deg >= dec_min,
-            UnifiedStarCatalog.dec_deg <= dec_max
-        ).limit(limit)
+        from sqlalchemy import or_
+        
+        # Handle RA wraparound (e.g., 350° to 10° crosses 0°)
+        if ra_min > ra_max:
+            query = self.db.query(UnifiedStarCatalog).filter(
+                or_(
+                    UnifiedStarCatalog.ra_deg >= ra_min,
+                    UnifiedStarCatalog.ra_deg <= ra_max
+                ),
+                UnifiedStarCatalog.dec_deg >= dec_min,
+                UnifiedStarCatalog.dec_deg <= dec_max
+            ).limit(limit)
+        else:
+            query = self.db.query(UnifiedStarCatalog).filter(
+                UnifiedStarCatalog.ra_deg >= ra_min,
+                UnifiedStarCatalog.ra_deg <= ra_max,
+                UnifiedStarCatalog.dec_deg >= dec_min,
+                UnifiedStarCatalog.dec_deg <= dec_max
+            ).limit(limit)
         
         results = query.all()
         logger.debug(

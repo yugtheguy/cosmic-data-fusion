@@ -5,7 +5,7 @@ import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import Dashboard from './pages/Dashboard';
 import StarDetailPage from './pages/StarDetailPage';
-
+import PlanetHunter from './pages/PlanetHunter';
 import QueryBuilder from './pages/QueryBuilder';
 
 function App() {
@@ -18,6 +18,7 @@ function App() {
                     <Route path="/signup" element={<SignUpPage />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/query" element={<QueryBuilder />} />
+                    <Route path="/planet-hunter" element={<PlanetHunter />} />
                     <Route path="/star/:id" element={<StarDetailPage />} />
                 </Routes>
             </Router>

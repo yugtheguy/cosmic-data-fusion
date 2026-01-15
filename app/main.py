@@ -14,9 +14,10 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors
+from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors, analysis
 
 # Configure logging
 logging.basicConfig(
@@ -87,12 +88,22 @@ with automatic coordinate standardization to ICRS J2000.
     redoc_url="/redoc",
 )
 
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Register API routers
 app.include_router(ingest.router)
 app.include_router(search.router)
 app.include_router(datasets.router)
 app.include_router(visualize.router)
 app.include_router(ai.router)  # AI Discovery endpoints (Phase 5)
+app.include_router(analysis.router)  # Analysis endpoints (Planet hunting, etc.)
 app.include_router(query.router)  # Query & Export endpoints (Phase 3)
 app.include_router(harmonize.router)  # Harmonization endpoints (Phase 2)
 app.include_router(schema_mapper.router)  # Schema Mapper endpoints

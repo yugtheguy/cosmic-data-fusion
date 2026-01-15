@@ -31,6 +31,10 @@ export const searchStars = async (params = {}) => {
     // Only add optional params if they have values
     if (params.min_mag !== undefined) body.min_mag = params.min_mag;
     if (params.max_mag !== undefined) body.max_mag = params.max_mag;
+    if (params.min_parallax !== undefined) body.min_parallax = params.min_parallax;
+    if (params.max_parallax !== undefined) body.max_parallax = params.max_parallax;
+    if (params.min_distance !== undefined) body.min_distance = params.min_distance;
+    if (params.max_distance !== undefined) body.max_distance = params.max_distance;
     if (params.ra_min !== undefined) body.ra_min = params.ra_min;
     if (params.ra_max !== undefined) body.ra_max = params.ra_max;
     if (params.dec_min !== undefined) body.dec_min = params.dec_min;
