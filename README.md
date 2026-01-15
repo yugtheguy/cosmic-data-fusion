@@ -132,7 +132,7 @@ We believe **astronomy should be data-driven, not data-blocked**. By combining m
 ## 🤖 How AI Powers Our Platform
 
 <div align="center">
-<img src="https://media.giphy.com/media/l0HlNQ03J5JxX6lva/giphy.gif" width="400px">
+<img src="https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif" width="400px" alt="AI Neural Network Animation">
 </div>
 
 ### 🔐 The Discovery Problem We Solve
@@ -286,7 +286,7 @@ COSMIC Data Fusion is architected as a production-grade data pipeline:
 
 </td>
 <td width="40%">
-<img src="https://media.giphy.com/media/L1R1tvI9svkIWwpVYr/giphy.gif" width="100%">
+<img src="https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif" width="100%" alt="Coding Animation">
 </td>
 </tr>
 </table>
@@ -552,35 +552,35 @@ docker-compose up -d
   <table>
     <tr>
       <td><b>🏠 Landing Page</b></td>
-      <td><b>📊 Analytics Dashboard</b></td>
+      <td><b>📊 Dashboard</b></td>
     </tr>
     <tr>
       <td><img src="./images/landing_page.png" alt="Landing Page" width="400"></td>
-      <td><img src="./images/analytics_dashboard.png" alt="Analytics Dashboard" width="400"></td>
+      <td><img src="./images/dahsboard.png" alt="Dashboard" width="400"></td>
     </tr>
     <tr>
-      <td><b>🤖 AI Discovery</b></td>
-      <td><b>🔍 Query Interface</b></td>
+      <td><b>🤖 AI Lab</b></td>
+      <td><b>🔍 Query Builder</b></td>
     </tr>
     <tr>
-      <td><img src="./images/ai_discovery.png" alt="AI Discovery" width="400"></td>
-      <td><img src="./images/query_interface.png" alt="Query Interface" width="400"></td>
+      <td><img src="./images/AI_Lab_Page.png" alt="AI Lab" width="400"></td>
+      <td><img src="./images/query_builder.png" alt="Query Builder" width="400"></td>
     </tr>
     <tr>
       <td><b>🗺️ Sky Map</b></td>
-      <td><b>📤 Export Options</b></td>
+      <td><b>🔗 Data Harmonizer</b></td>
     </tr>
     <tr>
       <td><img src="./images/sky_map.png" alt="Sky Map" width="400"></td>
-      <td><img src="./images/export_options.png" alt="Export Options" width="400"></td>
+      <td><img src="./images/Data_fusion_harmonizer_page.png" alt="Data Harmonizer" width="400"></td>
     </tr>
     <tr>
-      <td><b>🎯 Planet Hunter</b></td>
-      <td><b>📈 Statistics</b></td>
+      <td><b>📋 Data Table</b></td>
+      <td><b>🔐 Sign In</b></td>
     </tr>
     <tr>
-      <td><img src="./images/planet_hunter.png" alt="Planet Hunter" width="400"></td>
-      <td><img src="./images/statistics.png" alt="Statistics" width="400"></td>
+      <td><img src="./images/data_table_pafe.png" alt="Data Table" width="400"></td>
+      <td><img src="./images/sing_in_page.png" alt="Sign In" width="400"></td>
     </tr>
   </table>
 </div>
@@ -776,7 +776,7 @@ The core pipeline is feature-complete and tested with real Gaia DR3 and TESS dat
   <table>
     <tr>
       <td align="center">
-        <img src="https://media.giphy.com/media/qgQUggAC3Pfv687qPC/giphy.gif" width="150px" alt="Abhishek Chaudhari" style="border-radius: 50%;"><br>
+        <img src="https://media.giphy.com/media/bGgsc5mWoryfgKBx1u/giphy.gif" width="150px" alt="Abhishek Chaudhari" style="border-radius: 50%;"><br>
         <h3>🧑‍💻 Abhishek Chaudhari</h3>
         <p>Full Stack Developer</p>
         <a href="https://www.linkedin.com/in/abhishek-chaudhari-949002356" target="_blank">
@@ -787,7 +787,7 @@ The core pipeline is feature-complete and tested with real Gaia DR3 and TESS dat
         </a>
       </td>
       <td align="center">
-        <img src="https://media.giphy.com/media/qgQUggAC3Pfv687qPC/giphy.gif" width="150px" alt="Lokesh Gile" style="border-radius: 50%;"><br>
+        <img src="https://media.giphy.com/media/bGgsc5mWoryfgKBx1u/giphy.gif" width="150px" alt="Lokesh Gile" style="border-radius: 50%;"><br>
         <h3>🧑‍💻 Lokesh Gile</h3>
         <p>Backend & AI Developer</p>
         <a href="https://www.linkedin.com/in/lokesh-gile-b61145248" target="_blank">
@@ -800,7 +800,7 @@ The core pipeline is feature-complete and tested with real Gaia DR3 and TESS dat
     </tr>
     <tr>
       <td align="center">
-        <img src="https://media.giphy.com/media/qgQUggAC3Pfv687qPC/giphy.gif" width="150px" alt="Yug Deshmukh" style="border-radius: 50%;"><br>
+        <img src="https://media.giphy.com/media/bGgsc5mWoryfgKBx1u/giphy.gif" width="150px" alt="Yug Deshmukh" style="border-radius: 50%;"><br>
         <h3>🧑‍💻 Yug Deshmukh</h3>
         <p>Frontend Developer</p>
         <a href="https://www.linkedin.com/in/yugtheguy" target="_blank">
@@ -811,7 +811,7 @@ The core pipeline is feature-complete and tested with real Gaia DR3 and TESS dat
         </a>
       </td>
       <td align="center">
-        <img src="https://media.giphy.com/media/qgQUggAC3Pfv687qPC/giphy.gif" width="150px" alt="Deep Mehta" style="border-radius: 50%;"><br>
+        <img src="https://media.giphy.com/media/bGgsc5mWoryfgKBx1u/giphy.gif" width="150px" alt="Deep Mehta" style="border-radius: 50%;"><br>
         <h3>🧑‍💻 Deep Mehta</h3>
         <p>Data Pipeline & DevOps</p>
         <a href="https://www.linkedin.com/in/deep-mehta-857a09304" target="_blank">
