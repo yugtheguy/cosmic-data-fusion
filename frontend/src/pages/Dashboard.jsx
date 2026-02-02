@@ -22,7 +22,7 @@ import {
     CheckCircle,
     XCircle,
     AlertCircle,
-    Target
+    Target,
     Clock
 } from 'lucide-react';
 import {
