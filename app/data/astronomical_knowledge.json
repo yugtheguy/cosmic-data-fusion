@@ -1,0 +1,532 @@
+{
+    "constellations": {
+        "orion": {
+            "name": "Orion",
+            "abbreviation": "Ori",
+            "ra_center": 83.8,
+            "dec_center": -5.4,
+            "ra_min": 70,
+            "ra_max": 95,
+            "dec_min": -11,
+            "dec_max": 23
+        },
+        "ursa_major": {
+            "name": "Ursa Major",
+            "abbreviation": "UMa",
+            "ra_center": 165,
+            "dec_center": 55,
+            "ra_min": 120,
+            "ra_max": 210,
+            "dec_min": 30,
+            "dec_max": 75,
+            "aliases": [
+                "big dipper",
+                "great bear"
+            ]
+        },
+        "ursa_minor": {
+            "name": "Ursa Minor",
+            "abbreviation": "UMi",
+            "ra_center": 230,
+            "dec_center": 77,
+            "ra_min": 180,
+            "ra_max": 280,
+            "dec_min": 65,
+            "dec_max": 90,
+            "aliases": [
+                "little dipper",
+                "little bear"
+            ]
+        },
+        "cassiopeia": {
+            "name": "Cassiopeia",
+            "abbreviation": "Cas",
+            "ra_center": 15,
+            "dec_center": 60,
+            "ra_min": 350,
+            "ra_max": 50,
+            "dec_min": 45,
+            "dec_max": 77
+        },
+        "andromeda": {
+            "name": "Andromeda",
+            "abbreviation": "And",
+            "ra_center": 10,
+            "dec_center": 37,
+            "ra_min": 350,
+            "ra_max": 50,
+            "dec_min": 20,
+            "dec_max": 50
+        },
+        "perseus": {
+            "name": "Perseus",
+            "abbreviation": "Per",
+            "ra_center": 50,
+            "dec_center": 45,
+            "ra_min": 20,
+            "ra_max": 80,
+            "dec_min": 30,
+            "dec_max": 60
+        },
+        "taurus": {
+            "name": "Taurus",
+            "abbreviation": "Tau",
+            "ra_center": 65,
+            "dec_center": 15,
+            "ra_min": 45,
+            "ra_max": 90,
+            "dec_min": 0,
+            "dec_max": 30
+        },
+        "gemini": {
+            "name": "Gemini",
+            "abbreviation": "Gem",
+            "ra_center": 105,
+            "dec_center": 22,
+            "ra_min": 85,
+            "ra_max": 125,
+            "dec_min": 10,
+            "dec_max": 35
+        },
+        "leo": {
+            "name": "Leo",
+            "abbreviation": "Leo",
+            "ra_center": 165,
+            "dec_center": 15,
+            "ra_min": 140,
+            "ra_max": 190,
+            "dec_min": 0,
+            "dec_max": 30
+        },
+        "virgo": {
+            "name": "Virgo",
+            "abbreviation": "Vir",
+            "ra_center": 195,
+            "dec_center": 0,
+            "ra_min": 170,
+            "ra_max": 220,
+            "dec_min": -20,
+            "dec_max": 15
+        },
+        "sagittarius": {
+            "name": "Sagittarius",
+            "abbreviation": "Sgr",
+            "ra_center": 285,
+            "dec_center": -25,
+            "ra_min": 265,
+            "ra_max": 305,
+            "dec_min": -45,
+            "dec_max": -10
+        },
+        "scorpius": {
+            "name": "Scorpius",
+            "abbreviation": "Sco",
+            "ra_center": 250,
+            "dec_center": -25,
+            "ra_min": 230,
+            "ra_max": 270,
+            "dec_min": -45,
+            "dec_max": -5
+        },
+        "cygnus": {
+            "name": "Cygnus",
+            "abbreviation": "Cyg",
+            "ra_center": 305,
+            "dec_center": 42,
+            "ra_min": 285,
+            "ra_max": 330,
+            "dec_min": 25,
+            "dec_max": 60,
+            "aliases": [
+                "northern cross"
+            ]
+        },
+        "lyra": {
+            "name": "Lyra",
+            "abbreviation": "Lyr",
+            "ra_center": 285,
+            "dec_center": 37,
+            "ra_min": 275,
+            "ra_max": 295,
+            "dec_min": 25,
+            "dec_max": 48
+        },
+        "aquila": {
+            "name": "Aquila",
+            "abbreviation": "Aql",
+            "ra_center": 295,
+            "dec_center": 5,
+            "ra_min": 280,
+            "ra_max": 310,
+            "dec_min": -12,
+            "dec_max": 20
+        },
+        "pegasus": {
+            "name": "Pegasus",
+            "abbreviation": "Peg",
+            "ra_center": 340,
+            "dec_center": 20,
+            "ra_min": 320,
+            "ra_max": 360,
+            "dec_min": 2,
+            "dec_max": 36
+        },
+        "canis_major": {
+            "name": "Canis Major",
+            "abbreviation": "CMa",
+            "ra_center": 100,
+            "dec_center": -20,
+            "ra_min": 90,
+            "ra_max": 115,
+            "dec_min": -33,
+            "dec_max": -11,
+            "aliases": [
+                "greater dog"
+            ]
+        },
+        "canis_minor": {
+            "name": "Canis Minor",
+            "abbreviation": "CMi",
+            "ra_center": 115,
+            "dec_center": 6,
+            "ra_min": 110,
+            "ra_max": 120,
+            "dec_min": 0,
+            "dec_max": 13,
+            "aliases": [
+                "lesser dog"
+            ]
+        },
+        "crux": {
+            "name": "Crux",
+            "abbreviation": "Cru",
+            "ra_center": 190,
+            "dec_center": -60,
+            "ra_min": 180,
+            "ra_max": 200,
+            "dec_min": -65,
+            "dec_max": -55,
+            "aliases": [
+                "southern cross"
+            ]
+        },
+        "centaurus": {
+            "name": "Centaurus",
+            "abbreviation": "Cen",
+            "ra_center": 195,
+            "dec_center": -45,
+            "ra_min": 165,
+            "ra_max": 225,
+            "dec_min": -65,
+            "dec_max": -30
+        }
+    },
+    "magnitude_thresholds": {
+        "brightest": {
+            "description": "Exceptionally bright stars",
+            "max_magnitude": 1.0,
+            "percentile": 1
+        },
+        "very_bright": {
+            "description": "Very bright stars",
+            "max_magnitude": 2.0,
+            "percentile": 5
+        },
+        "bright": {
+            "description": "Bright stars easily visible",
+            "max_magnitude": 4.0,
+            "percentile": 10
+        },
+        "visible": {
+            "description": "Naked eye visible",
+            "max_magnitude": 6.0,
+            "percentile": 25
+        },
+        "dim": {
+            "description": "Requires binoculars",
+            "max_magnitude": 10.0,
+            "percentile": 50
+        },
+        "faint": {
+            "description": "Requires telescope",
+            "max_magnitude": 15.0,
+            "percentile": 75
+        }
+    },
+    "proper_motion_thresholds": {
+        "fastest": {
+            "description": "Exceptionally high proper motion",
+            "min_pm": 1000,
+            "percentile": 99,
+            "unit": "mas/yr"
+        },
+        "very_fast": {
+            "description": "Very high proper motion",
+            "min_pm": 200,
+            "percentile": 95,
+            "unit": "mas/yr"
+        },
+        "fast": {
+            "description": "High proper motion",
+            "min_pm": 100,
+            "percentile": 90,
+            "unit": "mas/yr"
+        },
+        "moving": {
+            "description": "Detectable proper motion",
+            "min_pm": 20,
+            "percentile": 75,
+            "unit": "mas/yr"
+        },
+        "slow": {
+            "description": "Low proper motion",
+            "min_pm": 5,
+            "percentile": 50,
+            "unit": "mas/yr"
+        },
+        "static": {
+            "description": "Minimal proper motion",
+            "min_pm": 0,
+            "percentile": 25,
+            "unit": "mas/yr"
+        }
+    },
+    "historical_epochs": {
+        "ancient_egypt": {
+            "epoch": -2500,
+            "description": "Ancient Egyptian civilization",
+            "keywords": [
+                "egypt",
+                "egyptian",
+                "pharaoh"
+            ]
+        },
+        "pyramids": {
+            "epoch": -2560,
+            "description": "Construction of Great Pyramid of Giza",
+            "keywords": [
+                "pyramid",
+                "giza",
+                "khufu"
+            ]
+        },
+        "stonehenge": {
+            "epoch": -2500,
+            "description": "Construction of Stonehenge",
+            "keywords": [
+                "stonehenge"
+            ]
+        },
+        "ancient_greece": {
+            "epoch": -500,
+            "description": "Classical Greek period",
+            "keywords": [
+                "greece",
+                "greek",
+                "athens",
+                "sparta"
+            ]
+        },
+        "roman_empire": {
+            "epoch": 100,
+            "description": "Height of Roman Empire",
+            "keywords": [
+                "rome",
+                "roman"
+            ]
+        },
+        "jesus": {
+            "epoch": 0,
+            "description": "Birth of Jesus Christ",
+            "keywords": [
+                "jesus",
+                "christ",
+                "bc",
+                "ad"
+            ]
+        },
+        "vedic": {
+            "epoch": -1500,
+            "description": "Vedic period in India",
+            "keywords": [
+                "vedic",
+                "veda"
+            ]
+        },
+        "babylon": {
+            "epoch": -1800,
+            "description": "Babylonian civilization",
+            "keywords": [
+                "babylon",
+                "babylonian"
+            ]
+        },
+        "future": {
+            "epoch": 3000,
+            "description": "Far future",
+            "keywords": [
+                "future"
+            ]
+        },
+        "present": {
+            "epoch": 2024,
+            "description": "Present day",
+            "keywords": [
+                "now",
+                "today",
+                "present",
+                "current"
+            ]
+        }
+    },
+    "city_locations": {
+        "mumbai": {
+            "latitude": 19.0760,
+            "longitude": 72.8777,
+            "timezone": "Asia/Kolkata"
+        },
+        "delhi": {
+            "latitude": 28.7041,
+            "longitude": 77.1025,
+            "timezone": "Asia/Kolkata"
+        },
+        "london": {
+            "latitude": 51.5074,
+            "longitude": -0.1278,
+            "timezone": "Europe/London"
+        },
+        "new_york": {
+            "latitude": 40.7128,
+            "longitude": -74.0060,
+            "timezone": "America/New_York"
+        },
+        "tokyo": {
+            "latitude": 35.6762,
+            "longitude": 139.6503,
+            "timezone": "Asia/Tokyo"
+        },
+        "sydney": {
+            "latitude": -33.8688,
+            "longitude": 151.2093,
+            "timezone": "Australia/Sydney"
+        },
+        "cairo": {
+            "latitude": 30.0444,
+            "longitude": 31.2357,
+            "timezone": "Africa/Cairo"
+        },
+        "paris": {
+            "latitude": 48.8566,
+            "longitude": 2.3522,
+            "timezone": "Europe/Paris"
+        }
+    },
+    "star_names": {
+        "sirius": {
+            "source_id": "Gaia DR3 2947050466531873024",
+            "common_name": "Sirius",
+            "constellation": "canis_major",
+            "magnitude": -1.46
+        },
+        "vega": {
+            "common_name": "Vega",
+            "constellation": "lyra",
+            "ra": 279.23,
+            "dec": 38.78,
+            "magnitude": 0.03
+        },
+        "betelgeuse": {
+            "common_name": "Betelgeuse",
+            "constellation": "orion",
+            "ra": 88.79,
+            "dec": 7.41,
+            "magnitude": 0.5
+        },
+        "rigel": {
+            "common_name": "Rigel",
+            "constellation": "orion",
+            "ra": 78.63,
+            "dec": -8.20,
+            "magnitude": 0.13
+        },
+        "polaris": {
+            "common_name": "Polaris",
+            "constellation": "ursa_minor",
+            "ra": 37.95,
+            "dec": 89.26,
+            "magnitude": 1.98,
+            "aliases": [
+                "north star",
+                "pole star"
+            ]
+        },
+        "proxima_centauri": {
+            "common_name": "Proxima Centauri",
+            "constellation": "centaurus",
+            "ra": 217.43,
+            "dec": -62.68,
+            "magnitude": 11.13,
+            "aliases": [
+                "proxima"
+            ]
+        },
+        "barnards_star": {
+            "common_name": "Barnard's Star",
+            "constellation": "ophiuchus",
+            "ra": 269.45,
+            "dec": 4.69,
+            "magnitude": 9.54,
+            "aliases": [
+                "barnard"
+            ]
+        }
+    },
+    "query_patterns": {
+        "brightness_keywords": [
+            "bright",
+            "brightest",
+            "dim",
+            "faint",
+            "visible",
+            "naked eye"
+        ],
+        "motion_keywords": [
+            "fast",
+            "fastest",
+            "slow",
+            "moving",
+            "static",
+            "high proper motion"
+        ],
+        "comparison_keywords": [
+            "compare",
+            "versus",
+            "vs",
+            "difference between"
+        ],
+        "count_keywords": [
+            "how many",
+            "count",
+            "number of",
+            "top",
+            "first"
+        ],
+        "time_keywords": [
+            "ancient",
+            "past",
+            "future",
+            "ago",
+            "years ago",
+            "bc",
+            "ad"
+        ],
+        "location_keywords": [
+            "near",
+            "around",
+            "in",
+            "at",
+            "from",
+            "visible from"
+        ]
+    }
+}

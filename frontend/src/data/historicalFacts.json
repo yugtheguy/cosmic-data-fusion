@@ -1,0 +1,100 @@
+{
+    "events": [
+        {
+            "year": -3000,
+            "title": "Thuban - The Ancient North Star",
+            "fact": "Thuban (Alpha Draconis) was the North Star for ancient Egyptians. The Great Pyramid's descending passage was aligned with it.",
+            "category": "astronomy"
+        },
+        {
+            "year": -2700,
+            "title": "Great Pyramid Construction",
+            "fact": "The Great Pyramid of Giza was built during this era, aligned with the stars that were different from today due to precession.",
+            "category": "history"
+        },
+        {
+            "year": -2000,
+            "title": "Stonehenge Era",
+            "fact": "Stonehenge was in active use. The stars visible from there have shifted positions noticeably since then.",
+            "category": "archaeology"
+        },
+        {
+            "year": -1500,
+            "title": "Egyptian Star Catalogs",
+            "fact": "Ancient Egyptians created some of the first known star catalogs. Many constellation patterns were similar to today.",
+            "category": "astronomy"
+        },
+        {
+            "year": -500,
+            "title": "Greek Astronomy Flourishes",
+            "fact": "Greek astronomers like Hipparchus began systematic star observations. They wouldn't recognize some stars' current positions!",
+            "category": "astronomy"
+        },
+        {
+            "year": 0,
+            "title": "Turn of the Common Era",
+            "fact": "The 'Star of Bethlehem' was recorded around this time. Stellar positions were slightly different from today.",
+            "category": "history"
+        },
+        {
+            "year": 150,
+            "title": "Ptolemy's Almagest",
+            "fact": "Ptolemy compiled the most detailed ancient star catalog with 1,022 stars. Our fast movers have shifted since then!",
+            "category": "astronomy"
+        },
+        {
+            "year": 1000,
+            "title": "Medieval Arab Astronomy",
+            "fact": "Islamic astronomers refined star positions. Many star names we use today (like Betelgeuse) come from Arabic.",
+            "category": "astronomy"
+        },
+        {
+            "year": 1609,
+            "title": "Galileo's Telescope",
+            "fact": "Galileo first turned a telescope to the night sky, revealing countless stars invisible to the naked eye.",
+            "category": "astronomy"
+        },
+        {
+            "year": 1838,
+            "title": "First Stellar Parallax",
+            "fact": "Friedrich Bessel measured the first stellar distance, proving stars were incredibly far away.",
+            "category": "astronomy"
+        },
+        {
+            "year": 1916,
+            "title": "Barnard's Star Measured",
+            "fact": "E.E. Barnard discovered the fastest-moving star in our sky - moving 10.3 arcseconds per year!",
+            "category": "astronomy"
+        },
+        {
+            "year": 2016,
+            "title": "Gaia DR3 Reference Epoch",
+            "fact": "ESA's Gaia spacecraft measured positions of 1.8 billion stars with unprecedented precision. This is our reference year!",
+            "category": "modern"
+        },
+        {
+            "year": 2026,
+            "title": "Present Day",
+            "fact": "You are viewing the current sky. Some stars have moved measurably even since Gaia's measurements!",
+            "category": "modern"
+        },
+        {
+            "year": 5000,
+            "title": "Future Sky - Vega Era",
+            "fact": "Around 13,700 AD, Vega will become the North Star. The night sky will look noticeably different.",
+            "category": "future"
+        },
+        {
+            "year": 10000,
+            "title": "Distant Future",
+            "fact": "Fast-moving stars like Barnard's Star will have shifted by degrees - visible changes to the naked eye!",
+            "category": "future"
+        },
+        {
+            "year": 50000,
+            "title": "Constellation Dissolution",
+            "fact": "Many familiar constellations will be unrecognizable. Orion's Belt stars are moving in different directions!",
+            "category": "future"
+        }
+    ]
+}

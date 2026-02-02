@@ -1446,3 +1446,177 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ============================================
+   TEMPORAL TRAJECTORY SECTION
+   ============================================ */
+
+.temporal-section {
+    margin-bottom: 2rem;
+}
+
+.temporal-section .section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.view-in-timemachine {
+    font-size: 0.8rem;
+    color: #d4683a;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.view-in-timemachine:hover {
+    color: #e8a87c;
+    text-decoration: underline;
+}
+
+.temporal-no-data {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 3rem 2rem;
+    background: rgba(26, 26, 46, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    text-align: center;
+    color: #666;
+}
+
+.temporal-no-data svg {
+    color: #555;
+}
+
+.temporal-no-data span {
+    font-size: 1rem;
+    color: #888;
+}
+
+.temporal-no-data p {
+    font-size: 0.85rem;
+    color: #555;
+    margin: 0;
+}
+
+.temporal-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+}
+
+.trajectory-graph {
+    background: rgba(26, 26, 46, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1rem;
+    min-height: 320px;
+}
+
+.motion-stats {
+    background: rgba(26, 26, 46, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+
+.motion-stats h3 {
+    font-size: 0.9rem;
+    color: #fff;
+    margin: 0 0 1.25rem 0;
+    font-weight: 600;
+}
+
+.motion-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.motion-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.motion-stat.highlight {
+    grid-column: span 2;
+    background: linear-gradient(135deg, rgba(212, 104, 58, 0.15), rgba(0, 0, 0, 0.2));
+    border-color: rgba(212, 104, 58, 0.3);
+}
+
+.motion-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+}
+
+.motion-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.motion-stat.highlight .motion-value {
+    background: linear-gradient(135deg, #fff 0%, #d4683a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.motion-unit {
+    font-size: 0.75rem;
+    color: #555;
+}
+
+.motion-classification {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: center;
+}
+
+.motion-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.motion-badge.fast {
+    background: linear-gradient(135deg, rgba(255, 59, 48, 0.2), rgba(255, 149, 0, 0.2));
+    border: 1px solid rgba(255, 149, 0, 0.4);
+    color: #ffb300;
+}
+
+.motion-badge.moderate {
+    background: rgba(74, 159, 110, 0.15);
+    border: 1px solid rgba(74, 159, 110, 0.3);
+    color: #4a9f6e;
+}
+
+.motion-badge.slow {
+    background: rgba(100, 100, 150, 0.15);
+    border: 1px solid rgba(100, 100, 150, 0.3);
+    color: #9999bb;
+}
+
+@media (max-width: 1000px) {
+    .temporal-container {
+        grid-template-columns: 1fr;
+    }
+
+    .trajectory-graph {
+        min-height: 280px;
+    }
+}

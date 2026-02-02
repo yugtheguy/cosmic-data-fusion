@@ -72,6 +72,47 @@ function QueryBuilder() {
         fetchStats();
     }, []);
 
+    // Load Time Machine selection from sessionStorage (for region selection integration)
+    const [selectionInfo, setSelectionInfo] = useState(null);
+    useEffect(() => {
+        const selectionData = sessionStorage.getItem('tm_region_selection');
+
+        if (selectionData) {
+            try {
+                const data = JSON.parse(selectionData);
+                console.log('Loaded Time Machine selection:', data);
+
+                // Pre-populate filters with selection data
+                setFilters(prev => ({
+                    ...prev,
+                    raMin: data.ra_range[0].toFixed(2),
+                    raMax: data.ra_range[1].toFixed(2),
+                    decMin: data.dec_range[0].toFixed(2),
+                    decMax: data.dec_range[1].toFixed(2),
+                    limit: Math.min(data.selection_count, 5000) // Use selection count (capped at 5000)
+                }));
+
+                // Switch to box search mode since we have RA/Dec ranges
+                setQueryMode('box');
+
+                // Store info for banner display
+                setSelectionInfo({
+                    count: data.selection_count,
+                    epoch: data.epoch,
+                    source: data.source
+                });
+
+                // DON'T clear sessionStorage - keep it so selection persists when navigating back
+                // User can clear it manually via the dismiss button on the info banner
+
+                // Show success message
+                toast.success(`Loaded ${data.selection_count} stars from Time Machine (epoch ${data.epoch})`);
+            } catch (err) {
+                console.error('Failed to parse Time Machine selection:', err);
+            }
+        }
+    }, []);
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFilters(prev => ({ ...prev, [name]: value }));
@@ -246,6 +287,47 @@ function QueryBuilder() {
                     <div className="panel-content">
                         {activeTab === 'filters' && (
                             <div className="filters-container">
+                                {/* Time Machine Selection Info Banner */}
+                                {selectionInfo && (
+                                    <div style={{
+                                        padding: '0.75rem 1rem',
+                                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
+                                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                                        borderRadius: '8px',
+                                        marginBottom: '1rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '0.5rem'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <Clock size={16} style={{ color: 'var(--accent-primary)' }} />
+                                            <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                                                Loaded <strong>{selectionInfo.count} stars</strong> from Time Machine (epoch <strong>{selectionInfo.epoch}</strong>)
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setSelectionInfo(null);
+                                                // Clear from sessionStorage when user dismisses
+                                                sessionStorage.removeItem('tm_region_selection');
+                                            }}
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: 'var(--text-secondary)',
+                                                cursor: 'pointer',
+                                                padding: '0.25rem',
+                                                fontSize: '1.25rem',
+                                                lineHeight: 1
+                                            }}
+                                            title="Dismiss and clear Time Machine selection"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* Query Mode Selector */}
                                 <div className="query-mode-selector">
                                     <button

@@ -344,7 +344,186 @@ function AnomalySection({ anomalyInfo, isLoading }) {
     );
 }
 
+// Temporal Trajectory Section - Time Machine integration
+function TemporalTrajectorySection({ star }) {
+    if (!star?.pmra || !star?.pmdec) {
+        return (
+            <section className="temporal-section">
+                <h2 className="section-title">
+                    <Clock size={18} />
+                    Temporal Trajectory
+                </h2>
+                <div className="temporal-no-data">
+                    <AlertCircle size={24} />
+                    <span>No proper motion data available for this star</span>
+                    <p>Temporal trajectory requires PMRA and PMDEC measurements</p>
+                </div>
+            </section>
+        );
+    }
+
+    // Calculate positions across time (-5000 to +5000 years from 2016)
+    const epochs = [];
+    const raPositions = [];
+    const decPositions = [];
+    const referenceYear = 2016;
+
+    for (let year = -3000; year <= 7000; year += 100) {
+        const deltaYears = year - referenceYear;
+        const raChange = (star.pmra / 3600000) * deltaYears; // Convert mas to deg
+        const decChange = (star.pmdec / 3600000) * deltaYears;
+
+        epochs.push(year);
+        raPositions.push(star.ra_deg + raChange);
+        decPositions.push(star.dec_deg + decChange);
+    }
+
+    // Calculate total proper motion
+    const totalPM = Math.sqrt(Math.pow(star.pmra, 2) + Math.pow(star.pmdec, 2));
+
+    // Calculate displacement over 10,000 years
+    const displacement = (totalPM / 3600000) * 10000; // degrees
+
+    const plotData = [
+        {
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'RA Trajectory',
+            x: epochs,
+            y: raPositions,
+            line: { color: '#d4683a', width: 2 },
+            marker: { size: 4 }
+        },
+        {
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Dec Trajectory',
+            x: epochs,
+            y: decPositions,
+            yaxis: 'y2',
+            line: { color: '#4a9f6e', width: 2 },
+            marker: { size: 4 }
+        },
+        // Current position marker
+        {
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Now (2016)',
+            x: [2016],
+            y: [star.ra_deg],
+            marker: { size: 12, color: '#ffd700', symbol: 'diamond', line: { width: 2, color: '#fff' } }
+        }
+    ];
+
+    const layout = {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: '#888888', family: 'Inter, sans-serif' },
+        margin: { t: 30, r: 60, b: 50, l: 60 },
+        xaxis: {
+            title: { text: 'Year', font: { size: 11 } },
+            gridcolor: 'rgba(42, 42, 42, 0.5)',
+            zerolinecolor: 'rgba(255, 215, 0, 0.5)',
+            tickfont: { size: 9 }
+        },
+        yaxis: {
+            title: { text: 'RA (°)', font: { size: 11, color: '#d4683a' } },
+            gridcolor: 'rgba(42, 42, 42, 0.5)',
+            tickfont: { size: 9 }
+        },
+        yaxis2: {
+            title: { text: 'Dec (°)', font: { size: 11, color: '#4a9f6e' } },
+            overlaying: 'y',
+            side: 'right',
+            gridcolor: 'transparent',
+            tickfont: { size: 9 }
+        },
+        showlegend: true,
+        legend: {
+            x: 0, y: 1.15,
+            orientation: 'h',
+            bgcolor: 'transparent',
+            font: { size: 10 }
+        },
+        dragmode: 'pan',
+        shapes: [
+            // Vertical line at present
+            {
+                type: 'line',
+                x0: 2016, y0: 0, x1: 2016, y1: 1,
+                yref: 'paper',
+                line: { color: 'rgba(255, 215, 0, 0.5)', width: 2, dash: 'dot' }
+            }
+        ]
+    };
+
+    const config = { displayModeBar: false, responsive: true };
+
+    return (
+        <section className="temporal-section">
+            <h2 className="section-title">
+                <Clock size={18} />
+                Temporal Trajectory
+                <Link to="/timemachine" className="view-in-timemachine">
+                    View in Time Machine →
+                </Link>
+            </h2>
+
+            <div className="temporal-container">
+                {/* Trajectory Graph */}
+                <div className="trajectory-graph">
+                    <Plot
+                        data={plotData}
+                        layout={layout}
+                        config={config}
+                        style={{ width: '100%', height: '100%' }}
+                        useResizeHandler={true}
+                    />
+                </div>
+
+                {/* Motion Statistics */}
+                <div className="motion-stats">
+                    <h3>Proper Motion</h3>
+                    <div className="motion-stat-grid">
+                        <div className="motion-stat">
+                            <span className="motion-label">PMRA</span>
+                            <span className="motion-value">{star.pmra?.toFixed(3)}</span>
+                            <span className="motion-unit">mas/yr</span>
+                        </div>
+                        <div className="motion-stat">
+                            <span className="motion-label">PMDec</span>
+                            <span className="motion-value">{star.pmdec?.toFixed(3)}</span>
+                            <span className="motion-unit">mas/yr</span>
+                        </div>
+                        <div className="motion-stat highlight">
+                            <span className="motion-label">Total PM</span>
+                            <span className="motion-value">{totalPM.toFixed(3)}</span>
+                            <span className="motion-unit">mas/yr</span>
+                        </div>
+                        <div className="motion-stat">
+                            <span className="motion-label">10,000 yr Shift</span>
+                            <span className="motion-value">{displacement.toFixed(4)}</span>
+                            <span className="motion-unit">degrees</span>
+                        </div>
+                    </div>
+
+                    <div className="motion-classification">
+                        {totalPM > 100 ? (
+                            <span className="motion-badge fast">⚡ Fast Mover</span>
+                        ) : totalPM > 30 ? (
+                            <span className="motion-badge moderate">↗ Moderate Motion</span>
+                        ) : (
+                            <span className="motion-badge slow">○ Slow Mover</span>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
 // Main Star Detail Page Component
+
 function StarDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -685,7 +864,11 @@ function StarDetailPage() {
                     isLoading={isLoadingAnomaly}
                 />
 
+                {/* Temporal Trajectory Section - Time Machine Integration */}
+                <TemporalTrajectorySection star={star} />
+
                 {/* Nearby Stars Section */}
+
                 <section className="nearby-section">
                     <h2 className="section-title">
                         <Zap size={18} />

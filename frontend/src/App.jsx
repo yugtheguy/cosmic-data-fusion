@@ -6,7 +6,9 @@ import SignUpPage from './pages/SignUpPage';
 import Dashboard from './pages/Dashboard';
 import StarDetailPage from './pages/StarDetailPage';
 import PlanetHunter from './pages/PlanetHunter';
+import TimeMachine from './pages/TimeMachine';
 import QueryBuilder from './pages/QueryBuilder';
+import CosmicChat from './components/CosmicChat';
 
 function App() {
     return (
@@ -17,10 +19,13 @@ function App() {
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/signup" element={<SignUpPage />} />
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/timemachine" element={<TimeMachine />} />
                     <Route path="/query" element={<QueryBuilder />} />
                     <Route path="/planet-hunter" element={<PlanetHunter />} />
                     <Route path="/star/:id" element={<StarDetailPage />} />
                 </Routes>
+                {/* Site-wide AI Chat Widget */}
+                <CosmicChat />
             </Router>
             <Toaster
                 position="top-right"

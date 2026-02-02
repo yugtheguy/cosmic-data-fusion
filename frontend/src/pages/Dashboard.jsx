@@ -23,6 +23,7 @@ import {
     XCircle,
     AlertCircle,
     Target
+    Clock
 } from 'lucide-react';
 import {
     searchStars,
@@ -44,6 +45,7 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
     const navigate = useNavigate();
     const navItems = [
         { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+        { id: 'timemachine', icon: Clock, label: 'Time Machine', link: '/timemachine' },
         { id: 'query', icon: Search, label: 'Query Builder' },
         { id: 'results', icon: Database, label: 'Data Table' },
         { id: 'upload', icon: UploadCloud, label: 'Ingest Data' },
@@ -70,7 +72,9 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
                         key={item.id}
                         className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
                         onClick={() => {
-                            if (item.id === 'query') {
+                            if (item.link) {
+                                navigate(item.link);
+                            } else if (item.id === 'query') {
                                 navigate('/query');
                             } else if (item.id === 'planet-hunter') {
                                 navigate('/planet-hunter');

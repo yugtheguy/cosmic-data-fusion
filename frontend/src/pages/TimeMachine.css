@@ -1,0 +1,1179 @@
+/* Time Machine Page - Matching Dashboard Design System */
+
+/* Reuse Dashboard Variables */
+:root {
+    --bg-solid: #0f0f0f;
+    --bg-surface: rgba(26, 26, 26, 0.6);
+    --border-color: #2a2a2a;
+    --accent-primary: #d4683a;
+    --accent-secondary: #e8a87c;
+    --text-primary: #e5e5e5;
+    --text-secondary: #888888;
+    --text-muted: #555555;
+    --success: #4a9f6e;
+    --warning: #d4683a;
+    --starlight-glow: rgba(212, 104, 58, 0.1);
+    --sidebar-width: 280px;
+    --header-height: 64px;
+}
+
+/* Page Title in Header */
+.page-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: 'Space Grotesk', monospace;
+    letter-spacing: 0.02em;
+}
+
+/* Epoch Badge */
+.epoch-badge {
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    border-radius: 8px;
+    font-family: 'Orbitron', monospace;
+    font-weight: 600;
+    font-size: 1rem;
+    color: white;
+    letter-spacing: 0.05em;
+    box-shadow: 0 4px 12px rgba(212, 104, 58, 0.3);
+}
+
+/* Range Inputs for Filters */
+.range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.range-inputs input[type="number"] {
+    flex: 1;
+    padding: 0.5rem;
+    background: rgba(26, 26, 26, 0.8);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.3s ease;
+}
+
+.range-inputs input[type="number"]:focus {
+    border-color: var(--accent-primary);
+}
+
+.range-inputs span {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.filter-group input[type="number"] {
+    width: 100%;
+    padding: 0.5rem;
+    background: rgba(26, 26, 26, 0.8);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.3s ease;
+    margin-top: 0.25rem;
+}
+
+.filter-group input[type="number"]:focus {
+    border-color: var(--accent-primary);
+}
+
+/* Skymap Info */
+.skymap-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.loading-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--accent-secondary);
+    font-style: italic;
+}
+
+.star-count {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Timeline Footer - Fixed at Bottom */
+.timeline-footer {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    z-index: 100;
+}
+
+/* Update Timeline Controller to match Dashboard theme */
+.timeline-controller {
+    background: var(--bg-surface);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Adjust main content padding for fixed timeline */
+.dashboard-main {
+    padding-bottom: 200px;
+    /* Space for timeline */
+}
+
+/* Override timeline colors to match */
+.timeline-controller .epoch-year {
+    color: var(--text-primary);
+    text-shadow: 0 0 20px rgba(212, 104, 58, 0.5);
+}
+
+.timeline-controller .control-btn {
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+}
+
+.timeline-controller .control-btn:hover {
+    box-shadow: 0 6px 20px rgba(212, 104, 58, 0.5);
+}
+
+.timeline-controller .speed-btn.active {
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+}
+
+.timeline-controller .bookmark-marker {
+    background: var(--accent-primary);
+}
+
+.timeline-controller .timeline-slider {
+    background: var(--border-color);
+}
+
+/* Make sure plotly dark theme matches */
+.skymap-plot .js-plotly-plot .plotly .modebar {
+    background: transparent !important;
+}
+
+.skymap-plot .js-plotly-plot .plotly .modebar-btn {
+    color: var(--text-secondary) !important;
+}
+
+.skymap-plot .js-plotly-plot .plotly .modebar-btn:hover {
+    background: rgba(212, 104, 58, 0.1) !important;
+    color: var(--accent-primary) !important;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1200px) {
+    .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .timeline-footer {
+        left: 0;
+    }
+
+    .dashboard-main {
+        margin-left: 0;
+        padding-bottom: 250px;
+    }
+
+    .dashboard-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .range-inputs {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .range-inputs span {
+        text-align: center;
+    }
+}
+
+/* Loading State Enhancements */
+.skymap-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    gap: 1rem;
+    color: var(--text-secondary);
+}
+
+.skymap-loading .spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Improve filter controls styling */
+.filter-controls {
+    margin-top: 0.75rem;
+}
+
+.filter-group {
+    margin-bottom: 1rem;
+}
+
+.filter-group label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Apply Filters Button */
+.apply-filters-btn {
+    width: 100%;
+    padding: 0.625rem 1rem;
+    margin-top: 0.5rem;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.apply-filters-btn:hover:not(:disabled) {
+    background: #c55a2f;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(212, 104, 58, 0.4);
+}
+
+.apply-filters-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Sky Map Container */
+.skymap-container {
+    margin: 0 1.5rem 1.5rem;
+    background: var(--bg-surface);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: visible;
+    /* Allow content to be visible */
+    transition: border-color 0.3s ease;
+    padding-bottom: 200px;
+    /* Space for timeline controller */
+    /* Space for timeline controller */
+}
+
+.skymap-container:hover {
+    border-color: rgba(212, 104, 58, 0.3);
+}
+
+.skymap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.skymap-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.skymap-plot {
+    height: 400px;
+    padding: 0.5rem;
+    background: rgba(15, 15, 15, 0.3);
+}
+
+/* Stats Row - reuse from Dashboard */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    padding: 1.5rem;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: var(--bg-surface);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 15px var(--starlight-glow);
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    width: 44px;
+    height: 44px;
+    background: rgba(212, 104, 58, 0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-primary);
+}
+
+.stat-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+}
+
+/* Fast Movers Panel */
+.sidebar-fast-movers {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.nav-section-label.clickable {
+    width: 100%;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: color 0.2s ease;
+}
+
+.nav-section-label.clickable:hover {
+    color: var(--accent-primary);
+}
+
+.toggle-arrow {
+    margin-left: auto;
+    font-size: 0.6rem;
+    opacity: 0.6;
+}
+
+.fast-movers-list {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.fast-mover-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(26, 26, 26, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.fast-mover-item:hover {
+    background: rgba(212, 104, 58, 0.1);
+    border-color: var(--accent-primary);
+    transform: translateX(2px);
+}
+
+.fm-rank {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    min-width: 24px;
+    text-align: center;
+}
+
+.fm-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    overflow: hidden;
+}
+
+.fm-id {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fm-pm {
+    font-size: 0.65rem;
+    color: var(--accent-secondary);
+}
+
+/* Selected fast mover item */
+.fast-mover-item.selected {
+    background: rgba(255, 215, 0, 0.15);
+    border-color: #ffd700;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.fast-mover-item.selected .fm-rank {
+    color: #ffd700;
+}
+
+/* Toggle buttons in skymap header */
+.skymap-toggles {
+    display: flex;
+    gap: 0.5rem;
+    margin-right: 1rem;
+}
+
+.toggle-btn {
+    padding: 0.35rem 0.75rem;
+    background: rgba(26, 26, 26, 0.8);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.toggle-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+/* Compare button has special amber color when active */
+.toggle-btn.compare.active {
+    background: linear-gradient(135deg, #ffc000 0%, #ff8c00 100%);
+    border-color: #ffc000;
+    box-shadow: 0 0 10px rgba(255, 192, 0, 0.4);
+}
+
+/* Historical Context Card */
+.historical-context-card {
+    display: flex;
+    gap: 1rem;
+    margin: 0 1.5rem 1.5rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, rgba(138, 43, 226, 0.15) 0%, rgba(75, 0, 130, 0.25) 100%);
+    border: 1px solid rgba(138, 43, 226, 0.4);
+    border-radius: 12px;
+    animation: slideIn 0.4s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.context-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: rgba(138, 43, 226, 0.3);
+    border-radius: 10px;
+    color: #dda0ff;
+    flex-shrink: 0;
+}
+
+.context-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.context-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #dda0ff;
+    margin-bottom: 0.35rem;
+}
+
+.context-fact {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+}
+
+.context-year {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-secondary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* ============================================
+   TIME WARP EFFECT - IMMERSIVE TIME TRAVEL
+   ============================================ */
+
+.time-warp-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    background: radial-gradient(ellipse at center,
+            rgba(0, 0, 0, 0.7) 0%,
+            rgba(0, 0, 0, 0.95) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: warpFadeIn 0.3s ease-out;
+    overflow: hidden;
+}
+
+@keyframes warpFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Hyperspace Star Streaks */
+.warp-stars {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    perspective: 1000px;
+}
+
+.warp-streak {
+    position: absolute;
+    width: 3px;
+    height: 150px;
+    background: linear-gradient(to bottom,
+            transparent,
+            rgba(255, 255, 255, 0.8) 30%,
+            rgba(212, 104, 58, 1) 60%,
+            transparent);
+    border-radius: 50%;
+    animation: warpStreak 1s ease-in-out forwards;
+    transform-origin: center bottom;
+    filter: blur(0.5px);
+}
+
+@keyframes warpStreak {
+    0% {
+        transform: translateY(100vh) scaleY(0.1) rotateX(60deg);
+        opacity: 0;
+    }
+
+    20% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-100vh) scaleY(3) rotateX(60deg);
+        opacity: 0;
+    }
+}
+
+/* Warp Content - Center */
+.warp-content {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    animation: warpContentPulse 1.5s ease-in-out;
+}
+
+@keyframes warpContentPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.warp-message {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    margin-bottom: 2rem;
+    text-shadow: 0 0 30px rgba(212, 104, 58, 0.8);
+    animation: warpGlow 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes warpGlow {
+    from {
+        text-shadow: 0 0 30px rgba(212, 104, 58, 0.6);
+    }
+
+    to {
+        text-shadow: 0 0 60px rgba(212, 104, 58, 1), 0 0 100px rgba(255, 191, 0, 0.5);
+    }
+}
+
+.warp-destination {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.destination-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+}
+
+.destination-year {
+    font-size: 4rem;
+    font-weight: 900;
+    font-family: 'Orbitron', 'Space Grotesk', monospace;
+    background: linear-gradient(135deg, #ffd700 0%, #ff8c00 50%, #ff6b35 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    filter: drop-shadow(0 0 20px rgba(255, 136, 0, 0.6));
+    animation: yearPulse 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes yearPulse {
+    from {
+        transform: scale(1);
+        filter: drop-shadow(0 0 20px rgba(255, 136, 0, 0.6));
+    }
+
+    to {
+        transform: scale(1.02);
+        filter: drop-shadow(0 0 40px rgba(255, 136, 0, 0.9));
+    }
+}
+
+.warp-context {
+    margin-top: 2rem;
+    font-size: 1.25rem;
+    color: rgba(221, 160, 255, 0.9);
+    font-style: italic;
+    max-width: 400px;
+    animation: contextFadeIn 0.5s ease-out 0.5s both;
+}
+
+@keyframes contextFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Vignette Effect */
+.warp-vignette {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at center,
+            transparent 30%,
+            rgba(0, 0, 0, 0.8) 100%);
+}
+
+/* Dashboard blur when warping */
+.dashboard.warping {
+    filter: blur(8px) brightness(0.5);
+    transition: filter 0.3s ease;
+}
+
+/* ============================================
+   AMBIENT STARFIELD - Subtle moving background
+   ============================================ */
+
+.ambient-starfield {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.ambient-star {
+    position: absolute;
+    border-radius: 50%;
+    background: white;
+}
+
+/* Three star sizes for depth */
+.ambient-star-1 {
+    width: 2px;
+    height: 2px;
+    opacity: 0.4;
+    animation: ambientDrift1 30s linear infinite;
+}
+
+.ambient-star-2 {
+    width: 3px;
+    height: 3px;
+    opacity: 0.5;
+    box-shadow: 0 0 4px rgba(212, 104, 58, 0.6);
+    animation: ambientDrift2 25s linear infinite;
+}
+
+.ambient-star-3 {
+    width: 4px;
+    height: 4px;
+    opacity: 0.6;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+    animation: ambientDrift3 20s linear infinite, ambientTwinkle 3s ease-in-out infinite;
+}
+
+@keyframes ambientDrift1 {
+    0% {
+        transform: translateY(0) translateX(0);
+    }
+
+    100% {
+        transform: translateY(-100vh) translateX(20px);
+    }
+}
+
+@keyframes ambientDrift2 {
+    0% {
+        transform: translateY(0) translateX(0);
+    }
+
+    100% {
+        transform: translateY(-100vh) translateX(-30px);
+    }
+}
+
+@keyframes ambientDrift3 {
+    0% {
+        transform: translateY(0) translateX(0);
+    }
+
+    100% {
+        transform: translateY(-100vh) translateX(15px);
+    }
+}
+
+@keyframes ambientTwinkle {
+
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+/* ============================================
+   MINI WARP EFFECTS - Fast Mover Click Pulse
+   ============================================ */
+
+.fast-mover-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.fast-mover-item::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: radial-gradient(circle, rgba(255, 215, 0, 0.4) 0%, transparent 70%);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+    pointer-events: none;
+}
+
+.fast-mover-item:active::after {
+    width: 200px;
+    height: 200px;
+}
+
+/* ============================================
+   LOADING STATE - Mini Streaks
+   ============================================ */
+
+.skymap-loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.skymap-loading::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+        linear-gradient(90deg, transparent 0%, rgba(212, 104, 58, 0.2) 50%, transparent 100%);
+    animation: loadingStreak 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingStreak {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* Enhanced loading spinner */
+.skymap-loading .spin {
+    animation: warpSpin 1s linear infinite;
+    filter: drop-shadow(0 0 10px rgba(212, 104, 58, 0.8));
+}
+
+@keyframes warpSpin {
+    0% {
+        transform: rotate(0deg) scale(1);
+    }
+
+    50% {
+        transform: rotate(180deg) scale(1.1);
+    }
+
+    100% {
+        transform: rotate(360deg) scale(1);
+    }
+}
+
+/* ============================================
+   FULLSCREEN STUDY MODE - Immersive Research
+   ============================================ */
+
+.dashboard.fullscreen-mode {
+    display: block;
+}
+
+.dashboard.fullscreen-mode .dashboard-sidebar {
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+}
+
+.dashboard.fullscreen-mode .dashboard-main {
+    margin-left: 0;
+    width: 100vw;
+    max-width: 100vw;
+    padding: 0;
+}
+
+.dashboard.fullscreen-mode .stats-row,
+.dashboard.fullscreen-mode .historical-context-card {
+    display: none;
+}
+
+.dashboard.fullscreen-mode .skymap-container {
+    height: calc(100vh - 180px);
+    margin: 0;
+    border-radius: 0;
+    border: none;
+}
+
+.dashboard.fullscreen-mode .skymap-header {
+    padding: 1rem 2rem;
+    border-radius: 0;
+}
+
+.dashboard.fullscreen-mode .skymap-plot {
+    height: calc(100vh - 250px);
+}
+
+.dashboard.fullscreen-mode .timeline-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    background: rgba(15, 15, 15, 0.98);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-color);
+}
+
+.dashboard.fullscreen-mode .timeline-footer .timeline-controller {
+    max-width: 100%;
+    margin: 0;
+    padding: 1rem 2rem;
+}
+
+
+/* Fullscreen toggle button has special blue color */
+.toggle-btn.fullscreen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.6rem;
+}
+
+.toggle-btn.fullscreen.active {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    border-color: #6366f1;
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+}
+
+/* Export toggle button has special green color */
+.toggle-btn.export {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.6rem;
+}
+
+.toggle-btn.export:hover:not(:disabled) {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-color: #10b981;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+}
+
+.toggle-btn.export:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.toggle-btn.export.loading {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-color: #10b981;
+}
+
+/* Smooth transitions for fullscreen mode */
+.dashboard-sidebar,
+.dashboard-main,
+.skymap-container,
+.stats-row,
+.historical-context-card {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   ANIMATION CONTROLS
+   ============================================ */
+
+.animation-controls {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.animation-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.anim-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    background: rgba(99, 102, 241, 0.1);
+    color: #e0e7ff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.anim-btn:hover:not(:disabled) {
+    background: rgba(99, 102, 241, 0.25);
+    border-color: rgba(99, 102, 241, 0.6);
+    transform: translateY(-1px);
+}
+
+.anim-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.anim-btn.load {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+.anim-btn.load:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.35) 0%, rgba(99, 102, 241, 0.35) 100%);
+}
+
+.anim-btn.primary {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.3) 100%);
+    border-color: rgba(16, 185, 129, 0.5);
+    min-width: 44px;
+    justify-content: center;
+}
+
+.anim-btn.primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.5) 0%, rgba(5, 150, 105, 0.5) 100%);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+.playback-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.speed-control input[type="range"] {
+    width: 80px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(99, 102, 241, 0.3);
+    appearance: none;
+    cursor: pointer;
+}
+
+.speed-control input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(139, 92, 246, 0.5);
+}
+
+.frame-counter {
+    color: #a5b4fc;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    background: rgba(99, 102, 241, 0.15);
+    border-radius: 6px;
+}
+
+.animation-progress {
+    margin-top: 10px;
+    height: 4px;
+    background: rgba(99, 102, 241, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.animation-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6 0%, #6366f1 50%, #10b981 100%);
+    border-radius: 2px;
+    transition: width 0.1s ease;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.anim-btn .spin {
+    animation: spin 1s linear infinite;
+}

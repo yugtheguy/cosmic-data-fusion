@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors, analytics
+from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors, temporal, natural_query
 
 # Configure logging
 logging.basicConfig(
@@ -91,10 +91,15 @@ with automatic coordinate standardization to ICRS J2000.
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # Alternative React port
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Register API routers
@@ -108,6 +113,8 @@ app.include_router(query.router)  # Query & Export endpoints (Phase 3)
 app.include_router(harmonize.router)  # Harmonization endpoints (Phase 2)
 app.include_router(schema_mapper.router)  # Schema Mapper endpoints
 app.include_router(errors.router)  # Error Reporting endpoints (Layer 1)
+app.include_router(temporal.router)  # Time Machine endpoints (Temporal queries)
+app.include_router(natural_query.router)  # Natural Language Query (Phase 6)
 app.include_router(health.router)
 
 
