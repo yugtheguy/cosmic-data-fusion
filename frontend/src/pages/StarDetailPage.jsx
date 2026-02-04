@@ -196,7 +196,7 @@ function NearbyStarsList({ nearbyStars, isLoading }) {
 
     return (
         <div className="nearby-list">
-            {nearbyStars.slice(0, 10).map((star, index) => (
+            {nearbyStars.map((star, index) => (
                 <div
                     key={star.id}
                     className="nearby-star-item"

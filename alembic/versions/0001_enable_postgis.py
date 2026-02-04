@@ -14,8 +14,9 @@ depends_on = None
 
 
 def upgrade():
-    # Enable PostGIS extension on PostgreSQL databases
-    op.execute('CREATE EXTENSION IF NOT EXISTS postgis;')
+    bind = op.get_bind()
+    if bind.engine.name == 'postgresql':
+        op.execute('CREATE EXTENSION IF NOT EXISTS postgis;')
 
 
 def downgrade():

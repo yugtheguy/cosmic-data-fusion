@@ -461,21 +461,28 @@ def delete_dataset(
     dataset_id: str,
     db: Session = Depends(get_db)
 ):
-    """Delete a dataset metadata record."""
+    """Delete a dataset and all associated stars."""
     from app.repository.dataset_repository import DatasetRepository
+    from app.repository.star_catalog import StarCatalogRepository
     
     try:
+        # 1. Delete associated star records
+        star_repo = StarCatalogRepository(db)
+        deleted_stars = star_repo.delete_by_dataset_id(dataset_id)
+        logger.info(f"Deleted {deleted_stars} stars for dataset {dataset_id}")
+        
+        # 2. Delete dataset metadata
         repo = DatasetRepository(db)
         deleted = repo.delete(dataset_id)
         
-        if not deleted:
+        if not deleted and deleted_stars == 0:
             raise HTTPException(
                 status_code=404,
                 detail=f"Dataset '{dataset_id}' not found"
             )
         
-        logger.info(f"Deleted dataset: {dataset_id}")
-        # 204 No Content - don't return anything
+        logger.info(f"Deleted dataset metadata: {dataset_id}")
+        # 204 No Content
         
     except HTTPException:
         raise

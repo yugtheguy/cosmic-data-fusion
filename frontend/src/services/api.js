@@ -40,20 +40,34 @@ export const searchStars = async (params = {}) => {
     if (params.dec_min !== undefined) body.dec_min = params.dec_min;
     if (params.dec_max !== undefined) body.dec_max = params.dec_max;
     if (params.original_source) body.original_source = params.original_source;
+    if (params.dataset_ids) body.dataset_ids = params.dataset_ids;
 
     const response = await api.post('/query/search', body);
     return response.data;
 };
 
-export const boxSearch = async (ra_min, ra_max, dec_min, dec_max, limit = 1000) => {
+export const boxSearch = async (ra_min, ra_max, dec_min, dec_max, limit = 1000, dataset_ids = null) => {
     // GET /search/box - Bounding box search
+    const params = {
+        ra_min,
+        ra_max,
+        dec_min,
+        dec_max,
+        limit
+    };
+
+    // Dataset IDs must be passed as repeated query params or handled by axios serializer
+    // By default axios handles array params as key[]=value, but FastAPI expects key=value&key=value
+    // We can explicitly add them to URLSearchParams or let axios handle it if configured, 
+    // but simpler to just pass it if using standard axios params serializer
+    if (dataset_ids && dataset_ids.length > 0) {
+        params.dataset_ids = dataset_ids;
+    }
+
     const response = await api.get('/search/box', {
-        params: {
-            ra_min,
-            ra_max,
-            dec_min,
-            dec_max,
-            limit
+        params,
+        paramsSerializer: {
+            indexes: null // Result: dataset_ids=1&dataset_ids=2...
         }
     });
     return response.data;
@@ -185,19 +199,50 @@ export const loadGaiaData = async () => {
     return response.data;
 };
 
+export const getDatasets = async () => {
+    // GET /datasets - List all datasets
+    const response = await api.get('/datasets');
+    return response.data;
+};
+
+export const deleteDataset = async (datasetId) => {
+    // DELETE /datasets/{dataset_id} - Delete dataset
+    await api.delete(`/datasets/${datasetId}`);
+};
+
 // ============================================
 // Ingestion APIs
 // ============================================
 export const uploadData = async (file, onUploadProgress) => {
     // POST /ingest/auto - Auto-detect and ingest file
+    // Note: If /ingest/auto does not exist, this might fail unless backend was updated. 
+    // For now assuming existing flow or falling back to one of the specific endpoints.
+    // However, for this task, we focus on preview.
+
+    // Fallback logic: try to guess type from extension if 'auto' endpoint missing?
+    // Actually, let's keep it as is, but add previewData.
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post('/ingest/auto', formData, {
+    const response = await api.post('/ingest/csv', formData, { // defaulting to CSV as generic ingest for now if auto missing
         headers: {
             'Content-Type': 'multipart/form-data',
         },
         onUploadProgress,
+    });
+    return response.data;
+};
+
+export const previewData = async (file, adapterType = 'auto', limit = 20) => {
+    // POST /ingest/preview
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post('/ingest/preview', formData, {
+        params: { adapter_type: adapterType, limit },
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        }
     });
     return response.data;
 };

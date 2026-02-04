@@ -24,6 +24,7 @@ from app.schemas import (
     IngestResponse,
     BulkIngestResponse,
     AutoIngestResponse,
+    IngestPreviewResponse,
     CoordinateFrame,
 )
 from app.services.ingestion import IngestionService
@@ -764,6 +765,68 @@ def ingest_fits_file(
             status_code=500,
             detail=f"Unexpected error: {str(e)}"
         )
+
+
+@router.post(
+    "/preview",
+    response_model=IngestPreviewResponse,
+    summary="Preview ingestion results",
+    description="Preview how a file will be ingested without saving to database. Useful for verifying schema mapping and cleaning rules."
+)
+async def preview_ingestion(
+    file: UploadFile = File(...),
+    adapter_type: str = "auto",
+    limit: int = 20
+):
+    """
+    Preview ingestion for a file.
+    
+    Args:
+        file: The file to preview
+        adapter_type: Type of adapter to use (gaia, sdss, fits, csv, auto)
+        limit: Number of rows to preview
+        
+    Returns:
+        Preview results with samples and validation stats
+    """
+    import tempfile
+    import os
+    from app.services.adapter_registry import registry
+    
+    # Save to temp file
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+        
+    try:
+        # Select adapter
+        if adapter_type == "auto":
+            adapter_class = registry.detect_adapter(tmp_path, file.filename)
+        else:
+            adapter_class = registry.get_adapter(adapter_type)
+            
+        if not adapter_class:
+            raise HTTPException(400, f"No adapter found for type: {adapter_type}")
+            
+        adapter = adapter_class()
+        
+        # Run preview
+        preview_result = adapter.preview(tmp_path, limit=limit)
+        
+        return IngestPreviewResponse(**preview_result)
+        
+    except Exception as e:
+        logger.error(f"Preview failed: {e}")
+        raise HTTPException(400, f"Preview failed: {str(e)}")
+        
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
 
 
 @router.post(

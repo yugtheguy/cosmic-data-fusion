@@ -55,7 +55,8 @@ class SearchService:
         ra_max: float,
         dec_min: float,
         dec_max: float,
-        limit: int = 1000
+        limit: int = 1000,
+        dataset_ids: Optional[List[str]] = None
     ) -> List[UnifiedStarCatalog]:
         """
         Search stars within a rectangular bounding box.
@@ -69,13 +70,15 @@ class SearchService:
             dec_min: Minimum Dec in degrees (ICRS)
             dec_max: Maximum Dec in degrees (ICRS)
             limit: Maximum results
+            dataset_ids: Optional list of dataset IDs to filter by
             
         Returns:
             List of matching UnifiedStarCatalog records
         """
         logger.info(
             f"Bounding box search: RA[{ra_min:.2f}°, {ra_max:.2f}°], "
-            f"Dec[{dec_min:.2f}°, {dec_max:.2f}°], limit={limit}"
+            f"Dec[{dec_min:.2f}°, {dec_max:.2f}°], limit={limit}, "
+            f"datasets={dataset_ids}"
         )
         
         results = self.repository.search_bounding_box(
@@ -83,7 +86,8 @@ class SearchService:
             ra_max=ra_max,
             dec_min=dec_min,
             dec_max=dec_max,
-            limit=limit
+            limit=limit,
+            dataset_ids=dataset_ids
         )
         
         logger.info(f"Bounding box search returned {len(results)} stars")

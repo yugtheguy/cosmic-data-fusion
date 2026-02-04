@@ -150,6 +150,104 @@ class BaseAdapter(ABC):
         """
         pass
     
+    def preview(
+        self,
+        input_data: Any,
+        limit: int = 20,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Preview ingestion results for a sample of the data.
+        
+        Does NOT persist to database. Used for verifying schema mapping
+        and data quality before full ingestion.
+        
+        Args:
+            input_data: Input data (file path, etc.)
+            limit: Number of records to preview
+            **kwargs: Additional parsing options
+            
+        Returns:
+            Dictionary with:
+            - source_columns: List of detected headers (if available)
+            - samples: List of mapped UnifiedStarCatalog dictionaries
+            - validation_summary: valid/invalid counts for the sample
+            - sample_errors: List of specific errors found
+        """
+        # Parse input (assume generator or list)
+        raw_records_iter = self.parse(input_data, **kwargs)
+        
+        preview_samples = []
+        errors = []
+        valid_count = 0
+        invalid_count = 0
+        source_columns = []
+        
+        # Iterate up to limit
+        for i, record in enumerate(raw_records_iter):
+            if i >= limit:
+                break
+                
+            # Capture columns from first record if possible
+            if i == 0 and hasattr(record, 'keys'):
+                source_columns = list(record.keys())
+                # specific validation for internal fields
+                if '_row_num' in source_columns:
+                    source_columns.remove('_row_num')
+            
+            # 1. Clean (Normalize)
+            cleaned_record = self.clean_record(record)
+            
+            # 2. Validate
+            validation = self.validate(cleaned_record)
+            
+            if validation.is_valid:
+                valid_count += 1
+                try:
+                    # 3. Map to Schema
+                    unified = self.map_to_unified_schema(cleaned_record)
+                    preview_samples.append(unified)
+                except Exception as e:
+                    # Mapping failed (unexpected)
+                    invalid_count += 1
+                    errors.append(f"Row {i+1}: Mapping error: {str(e)}")
+            else:
+                invalid_count += 1
+                errors.extend(validation.errors)
+                # Still try to map if possible for visual debugging? 
+                # No, safer to not show broken maps.
+        
+        return {
+            "source_columns": source_columns,
+            "samples": preview_samples,
+            "total_previewed": i + 1 if 'i' in locals() else 0,
+            "valid_count": valid_count,
+            "invalid_count": invalid_count,
+            "sample_errors": errors[:10]  # Limit error noise
+        }
+
+    def clean_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply basic cleaning rules to a raw record.
+        
+        Default behavior:
+        - Trim whitespace from string values
+        - Strip 'null', 'nan', 'None' strings to proper None
+        - Can be overridden by subclasses for specific logic
+        """
+        cleaned = {}
+        for k, v in record.items():
+            if isinstance(v, str):
+                v_clean = v.strip()
+                # Common "no data" markers in CSVs
+                if v_clean.lower() in ('', 'null', 'none', 'nan', 'n/a'):
+                    cleaned[k] = None
+                else:
+                    cleaned[k] = v_clean
+            else:
+                cleaned[k] = v
+        return cleaned
+
     def process_batch(
         self,
         input_data: Any,
@@ -158,54 +256,55 @@ class BaseAdapter(ABC):
     ) -> tuple[List[Dict[str, Any]], List[ValidationResult]]:
         """
         Process a batch of records end-to-end.
-        
-        This is the main entry point for ingestion.
-        
-        Args:
-            input_data: Input data to process
-            skip_invalid: Whether to skip invalid records or raise error
-            **kwargs: Additional options for parsing
-            
-        Returns:
-            Tuple of (valid_records, validation_results)
-            
-        Raises:
-            ValueError: If any record is invalid and skip_invalid=False
         """
         # Parse input
         raw_records = self.parse(input_data, **kwargs)
-        self.logger.info(f"Parsed {len(raw_records)} records from {self.source_name}")
+        
+        has_length = hasattr(raw_records, '__len__')
+        if has_length:
+            self.logger.info(f"Parsed {len(raw_records)} records from {self.source_name}")
+        else:
+            self.logger.info(f"Parsed records stream from {self.source_name}")
         
         valid_records = []
         validation_results = []
         
+        count = 0
         for idx, record in enumerate(raw_records):
-            # Validate
-            validation = self.validate(record)
+            count += 1
+            
+            # CLEAN step
+            cleaned_record = self.clean_record(record)
+            
+            # VALIDATE step
+            validation = self.validate(cleaned_record)
             validation_results.append(validation)
             
             if not validation.is_valid:
                 if skip_invalid:
-                    self.logger.warning(
-                        f"Skipping invalid record {idx}: {validation.errors}"
-                    )
+                    # Log every 1000th invalid record to avoid spam
+                    if len(validation_results) % 1000 == 0:
+                        self.logger.warning(
+                            f"Skipping invalid record {idx}: {validation.errors}"
+                        )
                     continue
                 else:
                     raise ValueError(
                         f"Invalid record at index {idx}: {validation.errors}"
                     )
             
-            # Map to unified schema
+            # MAP step
             try:
-                unified_record = self.map_to_unified_schema(record)
+                unified_record = self.map_to_unified_schema(cleaned_record)
                 valid_records.append(unified_record)
             except Exception as e:
                 self.logger.error(f"Failed to map record {idx}: {e}")
                 if not skip_invalid:
                     raise
         
+        total_count = len(raw_records) if has_length else count
         self.logger.info(
-            f"Processed {len(valid_records)}/{len(raw_records)} valid records"
+            f"Processed {len(valid_records)}/{total_count} valid records"
         )
         
         return valid_records, validation_results

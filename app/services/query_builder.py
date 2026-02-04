@@ -41,6 +41,7 @@ class QueryFilters:
         dec_min: Minimum Declination in degrees [-90, +90]
         dec_max: Maximum Declination in degrees [-90, +90]
         original_source: Filter by source catalog (e.g., "Gaia DR3")
+        dataset_ids: Filter by list of dataset UUIDs
         limit: Maximum number of results (default 1000)
         offset: Number of results to skip (for pagination)
     """
@@ -55,6 +56,7 @@ class QueryFilters:
     dec_min: Optional[float] = None
     dec_max: Optional[float] = None
     original_source: Optional[str] = None
+    dataset_ids: Optional[list[str]] = None
     limit: int = 1000
     offset: int = 0
 
@@ -208,6 +210,16 @@ class QueryBuilder:
                 UnifiedStarCatalog.original_source == filters.original_source
             )
             filters_applied.append(f"source = '{filters.original_source}'")
+            
+        # =====================================================================
+        # DATASET FILTER
+        # Filter by specific dataset UUIDs
+        # =====================================================================
+        if filters.dataset_ids:
+            query = query.filter(
+                UnifiedStarCatalog.dataset_id.in_(filters.dataset_ids)
+            )
+            filters_applied.append(f"datasets = {filters.dataset_ids}")
         
         # =====================================================================
         # PAGINATION
@@ -252,6 +264,7 @@ class QueryBuilder:
             dec_min=filters.dec_min,
             dec_max=filters.dec_max,
             original_source=filters.original_source,
+            dataset_ids=filters.dataset_ids,
             limit=0,  # No limit for count
             offset=0
         )
@@ -278,5 +291,7 @@ class QueryBuilder:
             query = query.filter(UnifiedStarCatalog.dec_deg <= count_filters.dec_max)
         if count_filters.original_source is not None:
             query = query.filter(UnifiedStarCatalog.original_source == count_filters.original_source)
-        
+        if count_filters.dataset_ids:
+            query = query.filter(UnifiedStarCatalog.dataset_id.in_(count_filters.dataset_ids))
+            
         return query.count()

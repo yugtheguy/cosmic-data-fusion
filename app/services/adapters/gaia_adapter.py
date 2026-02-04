@@ -130,16 +130,16 @@ class GaiaAdapter(BaseAdapter):
             "Expected file path, file-like object, or list of dicts."
         )
     
-    def _parse_csv_file(self, file_path: Union[str, Path], **kwargs) -> List[Dict[str, Any]]:
+    def _parse_csv_file(self, file_path: Union[str, Path], **kwargs):
         """
-        Parse CSV file from disk.
+        Parse CSV file from disk as a generator.
         
         Args:
             file_path: Path to CSV file
             **kwargs: encoding, etc.
             
-        Returns:
-            List of record dictionaries
+        Yields:
+             Record dictionaries
         """
         file_path = Path(file_path)
         
@@ -148,44 +148,56 @@ class GaiaAdapter(BaseAdapter):
         
         encoding = kwargs.get('encoding', 'utf-8')
         
-        try:
-            with open(file_path, 'r', encoding=encoding) as f:
-                return self._parse_csv_filelike(f, **kwargs)
-        except Exception as e:
-            raise ValueError(f"Failed to read CSV file: {e}")
+        # Generator that keeps file open during iteration
+        def generator():
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    yield from self._parse_csv_filelike(f, **kwargs)
+            except Exception as e:
+                raise ValueError(f"Failed to read CSV file: {e}")
+        
+        return generator()
     
-    def _parse_csv_filelike(self, file_obj, **kwargs) -> List[Dict[str, Any]]:
+    def _parse_csv_filelike(self, file_obj, **kwargs):
         """
-        Parse CSV from file-like object.
+        Parse CSV from file-like object as generator.
         
         Args:
-            file_obj: File-like object with read() method
+            file_obj: File-like object
             **kwargs: Additional options
             
-        Returns:
-            List of record dictionaries
+        Yields:
+             Record dictionaries
         """
-        records = []
+        import io
         
         try:
             # Read content
             if hasattr(file_obj, 'seek'):
                 file_obj.seek(0)
             
-            content = file_obj.read()
-            if isinstance(content, bytes):
-                content = content.decode('utf-8')
-            
-            # Filter out comment lines
-            lines = []
-            for line in content.split('\n'):
-                line_stripped = line.strip()
-                if line_stripped and not line_stripped.startswith('#'):
-                    lines.append(line)
-            
-            # Parse CSV
-            csv_content = '\n'.join(lines)
-            reader = csv.DictReader(StringIO(csv_content))
+            # Helper to iterate lines and decode if necessary
+            def line_iterator():
+                 # Detect if we need to decode bytes
+                 # We can't rely on isinstance(file_obj, io.BytesIO) alone 
+                 # because it might be a SpooledTemporaryFile or similar.
+                 
+                 # Strategy: read one line, check type, unread? 
+                 # Easier: just trust the iterator.
+                 
+                 wrapper = file_obj
+                 # If it looks like bytes, wrap it. 
+                 # But wrapping might buffer.
+                 
+                 for line in file_obj:
+                     if isinstance(line, bytes):
+                         line = line.decode('utf-8')
+                     
+                     line_stripped = line.strip()
+                     if line_stripped and not line_stripped.startswith('#'):
+                         yield line
+
+            reader = csv.DictReader(line_iterator())
             
             for row_num, row in enumerate(reader, start=1):
                 # Clean keys and values (remove whitespace)
@@ -194,10 +206,9 @@ class GaiaAdapter(BaseAdapter):
                 # Add row number for debugging
                 cleaned_row['_row_num'] = row_num
                 
-                records.append(cleaned_row)
+                yield cleaned_row
             
-            self.logger.info(f"Parsed {len(records)} records from CSV")
-            return records
+            self.logger.info(f"Finished parsing CSV stream")
             
         except Exception as e:
             raise ValueError(f"Failed to parse CSV: {e}")

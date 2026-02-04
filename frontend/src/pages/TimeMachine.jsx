@@ -26,7 +26,12 @@ import {
     Pause,
     Square,
     SkipBack,
-    SkipForward
+    SkipForward,
+    Target,
+    MapPin,
+    Layers,
+    ChevronDown,
+    ChevronRight
 } from 'lucide-react';
 import TimelineController from '../components/TimelineController';
 import UncertaintyCone from '../components/UncertaintyCone';
@@ -225,8 +230,8 @@ function TimeMachine() {
         if (epochDiff > 500 && !isWarping) {
             const direction = currentEpoch > previousEpoch ? 'FUTURE' : 'PAST';
             const message = direction === 'FUTURE'
-                ? `⚡ WARPING ${epochDiff.toLocaleString()} YEARS INTO THE FUTURE`
-                : `🌀 TRAVELING ${epochDiff.toLocaleString()} YEARS INTO THE PAST`;
+                ? `WARPING ${epochDiff.toLocaleString()} YEARS INTO THE FUTURE`
+                : `TRAVELING ${epochDiff.toLocaleString()} YEARS INTO THE PAST`;
 
             setWarpMessage(message);
             setIsWarping(true);
@@ -669,7 +674,7 @@ function TimeMachine() {
                         >
                             <Zap size={14} strokeWidth={1.5} />
                             Fast Movers ({fastMoversList.length})
-                            <span className="toggle-arrow">{showFastMovers ? '▼' : '▶'}</span>
+                            <span className="toggle-arrow">{showFastMovers ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
                         </button>
                         {showFastMovers && (
                             <div className="fast-movers-list">
@@ -827,14 +832,14 @@ function TimeMachine() {
                                         onClick={() => setShowUncertainty(!showUncertainty)}
                                         title="Show uncertainty cones (prediction confidence)"
                                     >
-                                        🎯 Uncertainty
+                                        <Target size={14} /> Uncertainty
                                     </button>
                                     <button
                                         className={`toggle-btn ${showHeatmap ? 'active' : ''}`}
                                         onClick={() => setShowHeatmap(!showHeatmap)}
                                         title="Show confidence heatmap background"
                                     >
-                                        🗺️ Heatmap
+                                        <Layers size={14} /> Heatmap
                                     </button>
                                     <button
                                         className={`toggle-btn ${selectionMode ? 'active' : ''}`}
@@ -848,7 +853,7 @@ function TimeMachine() {
                                         }}
                                         title="Select stars to query in Query Builder"
                                     >
-                                        📍 Select Region
+                                        <MapPin size={14} /> Select Region
                                     </button>
                                     <button
                                         className={`toggle-btn compare ${compareMode ? 'active' : ''}`}
@@ -1272,9 +1277,12 @@ function TimeMachine() {
                                     fontSize: '0.875rem',
                                     fontWeight: 600,
                                     color: 'var(--text-primary)',
-                                    fontFamily: 'Space Grotesk, monospace'
+                                    fontFamily: 'Space Grotesk, monospace',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
                                 }}>
-                                    🎯 Uncertainty Classes:
+                                    <Target size={16} /> Uncertainty Classes:
                                 </span>
                             </div>
 

@@ -118,6 +118,10 @@ class FilterParams(BaseModel):
         description="Filter by source catalog name (e.g., 'Gaia DR3').",
         examples=["Gaia DR3", "SDSS"]
     )
+    dataset_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Filter by specific dataset IDs.",
+    )
     limit: int = Field(
         default=1000,
         ge=1,
@@ -141,6 +145,7 @@ class StarRecord(BaseModel):
     parallax_mas: Optional[float]
     distance_pc: Optional[float]
     original_source: str
+    dataset_id: Optional[str] = None
 
 
 class SearchResponse(BaseModel):

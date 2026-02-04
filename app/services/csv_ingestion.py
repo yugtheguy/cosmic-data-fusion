@@ -111,44 +111,37 @@ class CSVIngestionService:
         
         return result
     
-    def read_csv(
+    def read_csv_generator(
         self,
         file_path: Path,
         skip_errors: bool = False,
         max_rows: Optional[int] = None
-    ) -> tuple[List[Dict[str, Any]], List[tuple[int, str]]]:
+    ):
         """
-        Read and parse a CSV file.
+        Read and parse a CSV file as a generator.
         
-        Args:
-            file_path: Path to the CSV file
-            skip_errors: If True, skip rows with errors instead of raising
-            max_rows: Maximum number of rows to read (None = all)
-            
-        Returns:
-            Tuple of (parsed_rows, errors) where errors is list of (row_num, message)
-            
-        Raises:
-            CSVIngestionError: If file cannot be read or has invalid structure
+        Yields:
+            Tuple of (parsed_row, error)
+            - parsed_row: Dict or None if error
+            - error: Tuple (row_num, message) or None if success
         """
         if not file_path.exists():
             raise CSVIngestionError(f"CSV file not found: {file_path}")
         
-        parsed_rows: List[Dict[str, Any]] = []
-        errors: List[tuple[int, str]] = []
-        
-        logger.info(f"Reading CSV file: {file_path}")
+        logger.info(f"Reading CSV file (streaming): {file_path}")
         
         try:
             with open(file_path, "r", encoding="utf-8") as f:
-                # Skip comment lines at the start of the file
-                lines = []
-                for line in f:
-                    if not line.strip().startswith("#"):
-                        lines.append(line)
+                # Iterate over lines to handle comments
+                # We need to peek or filter comments before creating DictReader
+                # But DictReader needs an iterable. Generator works.
                 
-                # Parse CSV from non-comment lines
-                reader = csv.DictReader(lines)
+                def line_generator():
+                    for line in f:
+                        if not line.strip().startswith("#"):
+                            yield line
+                
+                reader = csv.DictReader(line_generator())
                 
                 # Validate header
                 if reader.fieldnames is None:
@@ -157,26 +150,56 @@ class CSVIngestionService:
                 self.validate_columns(list(reader.fieldnames))
                 
                 # Process rows
+                count = 0
                 for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is 1)
-                    if max_rows is not None and len(parsed_rows) >= max_rows:
+                    if max_rows is not None and count >= max_rows:
                         logger.info(f"Reached max_rows limit: {max_rows}")
                         break
                     
                     try:
                         mapped_row = self.map_row(row)
-                        parsed_rows.append(mapped_row)
+                        count += 1
+                        yield mapped_row, None
                     except CSVIngestionError as e:
                         if skip_errors:
-                            errors.append((row_num, str(e)))
                             logger.warning(f"Row {row_num}: {e}")
+                            yield None, (row_num, str(e))
                         else:
                             raise CSVIngestionError(f"Row {row_num}: {e}")
-        
+                            
         except UnicodeDecodeError as e:
             raise CSVIngestionError(f"File encoding error: {e}")
         except csv.Error as e:
             raise CSVIngestionError(f"CSV parsing error: {e}")
+
+    def read_csv(
+        self,
+        file_path: Path,
+        skip_errors: bool = False,
+        max_rows: Optional[int] = None
+    ) -> tuple[List[Dict[str, Any]], List[tuple[int, str]]]:
+        """
+        Read and parse a CSV file (legacy method, loads all in memory).
         
+        Args:
+            file_path: Path to the CSV file
+            skip_errors: If True, skip rows with errors instead of raising
+            max_rows: Maximum number of rows to read (None = all)
+            
+        Returns:
+            Tuple of (parsed_rows, errors) where errors is list of (row_num, message)
+        """
+        parsed_rows: List[Dict[str, Any]] = []
+        errors: List[tuple[int, str]] = []
+        
+        generator = self.read_csv_generator(file_path, skip_errors, max_rows)
+        
+        for row, error in generator:
+            if row:
+                parsed_rows.append(row)
+            if error:
+                errors.append(error)
+                
         logger.info(
             f"CSV parsing complete: {len(parsed_rows)} rows parsed, "
             f"{len(errors)} errors"

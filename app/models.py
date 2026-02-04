@@ -92,6 +92,9 @@ class UnifiedStarCatalog(Base):
     # e.g., Gaia DR3 source and SDSS DR17 source that are the same star share this ID
     fusion_group_id = Column(String(36), nullable=True, index=True)
     
+    # User ownership (multi-tenancy)
+    user_id = Column(Integer, nullable=True, index=True)  # FK to users.id
+    
     # Audit timestamp
     created_at = Column(
         DateTime,
@@ -192,6 +195,9 @@ class DatasetMetadata(Base):
     license_info = Column(String(500), nullable=True)
     notes = Column(String(2000), nullable=True)
     
+    # User ownership (multi-tenancy)
+    user_id = Column(Integer, nullable=True, index=True)  # FK to users.id
+    
     # Audit timestamps
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -266,6 +272,9 @@ class IngestionError(Base):
     
     # Source reference
     source_row = Column(Integer, nullable=True)  # Row number in source file
+    
+    # User ownership (multi-tenancy)
+    user_id = Column(Integer, nullable=True, index=True)  # FK to users.id
     
     # Audit timestamp
     timestamp = Column(
@@ -356,3 +365,62 @@ class DiscoveryResult(Base):
             f"<DiscoveryResult(run_id='{self.run_id}', star={self.star_id}, "
             f"anomaly={bool(self.is_anomaly)})>"
         )
+
+
+class User(Base):
+    """
+    User model for authentication and authorization.
+    
+    This model stores user account information including credentials,
+    profile data, and access control flags. All user data (datasets,
+    stars, analyses) will be associated with a user_id for multi-tenancy.
+    
+    Security Features:
+        - Password is never stored in plaintext (bcrypt hashing)
+        - Email is unique and indexed for fast lookups
+        - is_active flag for soft account deletion
+        - is_superuser flag for admin privileges
+        - Timestamps for auditing
+    
+    Attributes:
+        id: Auto-incrementing primary key
+        email: Unique email address (used for login)
+        hashed_password: Bcrypt hashed password
+        full_name: User's full name (optional)
+        is_active: Whether account is active (default: True)
+        is_superuser: Whether user has admin privileges (default: False)
+        created_at: UTC timestamp when account was created
+        updated_at: UTC timestamp when account was last modified
+    """
+    
+    __tablename__ = "users"
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # Authentication
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    
+    # Profile
+    full_name = Column(String(255), nullable=True)
+    
+    # Access control
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_superuser = Column(Boolean, default=False, nullable=False)
+    
+    # Audit timestamps
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+    
+    def __repr__(self) -> str:
+        return f"<User(id={self.id}, email='{self.email}', active={self.is_active})>"

@@ -88,13 +88,31 @@ class StarCatalogRepository:
             UnifiedStarCatalog.id == star_id
         ).first()
     
+    def delete_by_dataset_id(self, dataset_id: str) -> int:
+        """
+        Delete all stars associated with a specific dataset.
+        
+        Args:
+            dataset_id: The UUID of the dataset
+            
+        Returns:
+            Number of deleted records
+        """
+        deleted_count = self.db.query(UnifiedStarCatalog).filter(
+            UnifiedStarCatalog.dataset_id == dataset_id
+        ).delete()
+        self.db.commit()
+        logger.info(f"Deleted {deleted_count} stars for dataset {dataset_id}")
+        return deleted_count
+
     def search_bounding_box(
         self,
         ra_min: float,
         ra_max: float,
         dec_min: float,
         dec_max: float,
-        limit: int = 1000
+        limit: int = 1000,
+        dataset_ids: Optional[List[str]] = None
     ) -> List[UnifiedStarCatalog]:
         """
         Search stars within a rectangular bounding box.
@@ -108,10 +126,18 @@ class StarCatalogRepository:
             dec_min: Minimum Dec in degrees (-90 to 90)
             dec_max: Maximum Dec in degrees (-90 to 90)
             limit: Maximum results to return
+            dataset_ids: Optional list of dataset IDs to filter by
             
         Returns:
             List of matching stars
         """
+        # Base query builder
+        def build_query(base_filter):
+            q = self.db.query(UnifiedStarCatalog).filter(base_filter)
+            if dataset_ids:
+                q = q.filter(UnifiedStarCatalog.dataset_id.in_(dataset_ids))
+            return q
+            
         results = []
 
         # Check for RA wraparound (e.g., ra_min=350, ra_max=10)
@@ -122,20 +148,22 @@ class StarCatalogRepository:
             )
             
             # Query 1: [ra_min, 360]
-            query1 = self.db.query(UnifiedStarCatalog).filter(
-                UnifiedStarCatalog.ra_deg >= ra_min,
-                UnifiedStarCatalog.ra_deg <= 360.0,
-                UnifiedStarCatalog.dec_deg >= dec_min,
-                UnifiedStarCatalog.dec_deg <= dec_max
-            ).limit(limit)
+            filter1 = (
+                (UnifiedStarCatalog.ra_deg >= ra_min) &
+                (UnifiedStarCatalog.ra_deg <= 360.0) &
+                (UnifiedStarCatalog.dec_deg >= dec_min) &
+                (UnifiedStarCatalog.dec_deg <= dec_max)
+            )
+            query1 = build_query(filter1).limit(limit)
             
             # Query 2: [0, ra_max]
-            query2 = self.db.query(UnifiedStarCatalog).filter(
-                UnifiedStarCatalog.ra_deg >= 0.0,
-                UnifiedStarCatalog.ra_deg <= ra_max,
-                UnifiedStarCatalog.dec_deg >= dec_min,
-                UnifiedStarCatalog.dec_deg <= dec_max
-            ).limit(limit)
+            filter2 = (
+                (UnifiedStarCatalog.ra_deg >= 0.0) &
+                (UnifiedStarCatalog.ra_deg <= ra_max) &
+                (UnifiedStarCatalog.dec_deg >= dec_min) &
+                (UnifiedStarCatalog.dec_deg <= dec_max)
+            )
+            query2 = build_query(filter2).limit(limit)
             
             results = query1.all() + query2.all()
             
@@ -149,12 +177,13 @@ class StarCatalogRepository:
             )
         else:
             # Normal case: no wraparound
-            query = self.db.query(UnifiedStarCatalog).filter(
-                UnifiedStarCatalog.ra_deg >= ra_min,
-                UnifiedStarCatalog.ra_deg <= ra_max,
-                UnifiedStarCatalog.dec_deg >= dec_min,
-                UnifiedStarCatalog.dec_deg <= dec_max
-            ).limit(limit)
+            normal_filter = (
+                (UnifiedStarCatalog.ra_deg >= ra_min) &
+                (UnifiedStarCatalog.ra_deg <= ra_max) &
+                (UnifiedStarCatalog.dec_deg >= dec_min) &
+                (UnifiedStarCatalog.dec_deg <= dec_max)
+            )
+            query = build_query(normal_filter).limit(limit)
             
             results = query.all()
             

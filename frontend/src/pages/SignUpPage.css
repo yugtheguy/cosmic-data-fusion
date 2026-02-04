@@ -153,10 +153,9 @@
 /* Signup Form Container */
 .signup-form-container {
     position: fixed;
-    top: 50%;
+    top: 5%;
     right: 8%;
     left: auto;
-    transform: translateY(-50%);
     z-index: 20;
     display: flex;
     align-items: center;
@@ -177,12 +176,11 @@
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
-    padding: 2rem;
+    padding: 1rem;
     box-shadow:
         0 25px 50px rgba(0, 0, 0, 0.5),
         0 0 100px rgba(99, 102, 241, 0.1),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    overflow: hidden;
 }
 
 /* Form Styles - same as login */
@@ -250,7 +248,7 @@
     font-weight: 600;
     color: #fff;
     text-align: center;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.1rem;
 }
 
 .signup-subtitle {
@@ -264,13 +262,13 @@
 .signup-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.2rem;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.1rem;
 }
 
 .form-label {
@@ -460,11 +458,12 @@
     }
 
     .signup-form-container {
-        position: relative;
-        top: 0;
-        transform: none;
-        min-height: 100vh;
-        padding: 2rem 0;
+        position: fixed;
+        top: 5%;
+        right: 50%;
+        transform: translateX(50%);
+        width: 100%;
+        padding: 1rem;
     }
 
     .back-link {

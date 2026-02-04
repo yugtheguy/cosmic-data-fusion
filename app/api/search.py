@@ -55,6 +55,10 @@ def search_bounding_box(
         default=1000, ge=1, le=10000,
         description="Maximum results to return"
     ),
+    dataset_ids: list[str] | None = Query(
+         default=None,
+         description="Filter by one or more dataset IDs"
+    ),
     db: Session = Depends(get_db)
 ):
     """
@@ -73,6 +77,7 @@ def search_bounding_box(
         dec_min: Minimum Declination (degrees)
         dec_max: Maximum Declination (degrees)
         limit: Maximum number of results
+        dataset_ids: Optional list of dataset IDs to filter by
         db: Database session (injected)
         
     Returns:
@@ -96,7 +101,8 @@ def search_bounding_box(
             ra_max=ra_max,
             dec_min=dec_min,
             dec_max=dec_max,
-            limit=limit
+            limit=limit,
+            dataset_ids=dataset_ids
         )
         
         # Convert to StarRecord format
@@ -111,7 +117,8 @@ def search_bounding_box(
                 brightness_mag=star.brightness_mag,
                 parallax_mas=star.parallax_mas,
                 distance_pc=star.distance_pc,
-                original_source=star.original_source
+                original_source=star.original_source,
+                dataset_id=star.dataset_id
             ))
         
         # Return standardized format

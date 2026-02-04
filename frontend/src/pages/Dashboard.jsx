@@ -23,7 +23,8 @@ import {
     XCircle,
     AlertCircle,
     Target,
-    Clock
+    Clock,
+    Eye
 } from 'lucide-react';
 import {
     searchStars,
@@ -32,7 +33,10 @@ import {
     downloadExport,
     checkHealth,
     loadGaiaData,
-    uploadData
+    uploadData,
+    previewData,
+    getDatasets,
+    deleteDataset
 } from '../services/api';
 import SchemaMapper from '../components/SchemaMapper';
 import AILab from '../components/AILab';
@@ -41,7 +45,7 @@ import ResultsTable from '../components/ResultsTable';
 import './Dashboard.css';
 
 // Sidebar Navigation Component
-function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters, isLoading }) {
+function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters, isLoading, datasets, onDeleteDataset }) {
     const navigate = useNavigate();
     const navItems = [
         { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
@@ -100,6 +104,8 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
                     setFilters={setFilters}
                     onResetFilters={onResetFilters}
                     isLoading={isLoading}
+                    datasets={datasets}
+                    onDeleteDataset={onDeleteDataset}
                 />
             </div>
 
@@ -121,9 +127,54 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
 }
 
 // Filter Controls Component
-function FilterControls({ filters, setFilters, onResetFilters, isLoading }) {
+function FilterControls({ filters, setFilters, onResetFilters, isLoading, datasets, onDeleteDataset }) {
+
+    const toggleDataset = (id) => {
+        const currentIds = filters.dataset_ids || [];
+        if (currentIds.includes(id)) {
+            setFilters({
+                ...filters,
+                dataset_ids: currentIds.filter(d => d !== id)
+            });
+        } else {
+            setFilters({
+                ...filters,
+                dataset_ids: [...currentIds, id]
+            });
+        }
+    };
+
     return (
         <div className="filter-controls">
+            {datasets && datasets.length > 0 && (
+                <div className="filter-group">
+                    <label>My Uploads</label>
+                    <div className="dataset-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+                        {datasets.map(d => (
+                            <div key={d.id} className="dataset-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', flex: 1 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.dataset_ids?.includes(d.id)}
+                                        onChange={() => toggleDataset(d.id)}
+                                    />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.name}>
+                                        {d.name.length > 15 ? d.name.substring(0, 15) + '...' : d.name}
+                                    </span>
+                                </label>
+                                <button
+                                    onClick={() => onDeleteDataset(d.id)}
+                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}
+                                    title="Delete Dataset"
+                                >
+                                    <LogOut size={12} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="filter-group">
                 <label>RA Min (°)</label>
                 <div className="range-display">
@@ -295,11 +346,13 @@ function SkyMap({ stars, anomalies, isLoading }) {
         'SDSS': true,
         '2MASS': true,
         'Tycho-2': true,
+        'TESS': true,
         'Other': true
     });
     const [mouseCoords, setMouseCoords] = useState({ ra: null, dec: null });
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedRegion, setSelectedRegion] = useState(null);
+    const [viewBounds, setViewBounds] = useState(null); // { x: [min, max], y: [min, max] }
     const navigate = useNavigate();
 
     // Catalog color mapping (Orange shades)
@@ -308,7 +361,37 @@ function SkyMap({ stars, anomalies, isLoading }) {
         'SDSS': '#e8a87c',     // Light orange
         '2MASS': '#ef4444',    // Red (kept for contrast)
         'Tycho-2': '#f59e0b',  // Amber
+        'TESS': '#8b5cf6',     // Purple (High-tech/Exoplanets)
         'Other': '#c2410c'     // Deep burnt orange
+    };
+
+    // Auto-zoom when stars change
+    useEffect(() => {
+        if (stars && stars.length > 0) {
+            // Find bounds
+            let minRa = 360, maxRa = 0, minDec = 90, maxDec = -90;
+            stars.forEach(s => {
+                if (s.ra_deg < minRa) minRa = s.ra_deg;
+                if (s.ra_deg > maxRa) maxRa = s.ra_deg;
+                if (s.dec_deg < minDec) minDec = s.dec_deg;
+                if (s.dec_deg > maxDec) maxDec = s.dec_deg;
+            });
+
+            // Add padding (approx 10%)
+            const raSpan = maxRa - minRa;
+            const decSpan = maxDec - minDec;
+            const padding = Math.max(raSpan, decSpan, 0.5) * 0.1;
+
+            // X axis is reversed for RA (East to West)
+            setViewBounds({
+                x: [360 - (minRa - padding), 360 - (maxRa + padding)],
+                y: [minDec - padding, maxDec + padding]
+            });
+        }
+    }, [stars]);
+
+    const handleResetZoom = () => {
+        setViewBounds(null); // Reset to full sky
     };
 
     const getCatalogKey = (source) => {
@@ -318,6 +401,7 @@ function SkyMap({ stars, anomalies, isLoading }) {
         if (s.includes('sdss')) return 'SDSS';
         if (s.includes('2mass')) return '2MASS';
         if (s.includes('tycho')) return 'Tycho-2';
+        if (s.includes('tess')) return 'TESS';
         return 'Other';
     };
 
@@ -351,7 +435,7 @@ function SkyMap({ stars, anomalies, isLoading }) {
         y: catStars.map(s => s.dec_deg || 0),
         customdata: catStars.map(s => s.id),
         marker: {
-            size: catStars.map(s => Math.max(4, 14 - (s.brightness_mag || 10))),
+            size: catStars.map(s => Math.max(6, 16 - (s.brightness_mag || 10) * 0.8)), // Slightly larger for visibility
             color: catalogColors[catalog],
             opacity: 0.85,
             line: { width: 0.5, color: 'rgba(255,255,255,0.3)' }
@@ -387,19 +471,19 @@ function SkyMap({ stars, anomalies, isLoading }) {
         margin: { t: 30, r: 30, b: 60, l: 70 },
         xaxis: {
             title: { text: 'Right Ascension (°)', font: { size: 12, color: '#888' } },
-            range: [360, 0],
+            range: viewBounds ? viewBounds.x : [360, 0],
             gridcolor: 'rgba(60, 60, 80, 0.4)',
             zerolinecolor: 'rgba(100, 100, 120, 0.5)',
             tickfont: { size: 10 },
-            dtick: 30,
+            dtick: viewBounds ? undefined : 30, // Auto ticks when zoomed
         },
         yaxis: {
             title: { text: 'Declination (°)', font: { size: 12, color: '#888' } },
-            range: [-90, 90],
+            range: viewBounds ? viewBounds.y : [-90, 90],
             gridcolor: 'rgba(60, 60, 80, 0.4)',
             zerolinecolor: 'rgba(100, 100, 120, 0.5)',
             tickfont: { size: 10 },
-            dtick: 30,
+            dtick: viewBounds ? undefined : 30, // Auto ticks when zoomed
         },
         showlegend: true,
         legend: {
@@ -488,6 +572,58 @@ function SkyMap({ stars, anomalies, isLoading }) {
                     <span className="coord-value">{mouseCoords.ra || '—'}°</span>
                     <span className="coord-label">Dec:</span>
                     <span className="coord-value">{mouseCoords.dec || '—'}°</span>
+
+                    {/* View Controls */}
+                    <div className="view-controls" style={{ marginLeft: '1rem', display: 'flex', gap: '8px' }}>
+                        <button
+                            className="view-btn"
+                            onClick={() => setViewBounds(null)}
+                            title="Reset to full sky view"
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                color: '#aaa',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Full Sky
+                        </button>
+                        <button
+                            className="view-btn"
+                            title="Zoom to fit data"
+                            style={{
+                                background: 'rgba(59, 130, 246, 0.2)',
+                                border: '1px solid rgba(59, 130, 246, 0.4)',
+                                color: '#60a5fa',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                cursor: 'pointer'
+                            }}
+                            onClick={() => {
+                                // Re-calculate bounds
+                                if (stars && stars.length > 0) {
+                                    let minRa = 360, maxRa = 0, minDec = 90, maxDec = -90;
+                                    stars.forEach(s => {
+                                        if (s.ra_deg < minRa) minRa = s.ra_deg;
+                                        if (s.ra_deg > maxRa) maxRa = s.ra_deg;
+                                        if (s.dec_deg < minDec) minDec = s.dec_deg;
+                                        if (s.dec_deg > maxDec) maxDec = s.dec_deg;
+                                    });
+                                    const padding = Math.max((maxRa - minRa), (maxDec - minDec), 0.5) * 0.1;
+                                    setViewBounds({
+                                        x: [360 - (minRa - padding), 360 - (maxRa + padding)],
+                                        y: [minDec - padding, maxDec + padding]
+                                    });
+                                }
+                            }}
+                        >
+                            Fit Data
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -629,12 +765,14 @@ function AnomalyList({ anomalies, isLoading }) {
 }
 
 // Upload View Component
-function UploadView({ setActiveTab }) {
+function UploadView({ setActiveTab, onUploadSuccess }) {
     const [dragActive, setDragActive] = useState(false);
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
+    const [processingPreview, setProcessingPreview] = useState(false);
     const [progress, setProgress] = useState(0);
     const [result, setResult] = useState(null);
+    const [previewResult, setPreviewResult] = useState(null);
     const [error, setError] = useState(null);
 
     const handleDrag = (e) => {
@@ -666,7 +804,23 @@ function UploadView({ setActiveTab }) {
     const handleFiles = (fileList) => {
         setFiles(Array.from(fileList));
         setResult(null);
+        setPreviewResult(null);
         setError(null);
+    };
+
+    const handlePreview = async () => {
+        if (!files.length) return;
+        setProcessingPreview(true);
+        setError(null);
+        try {
+            const data = await previewData(files[0]);
+            setPreviewResult(data);
+        } catch (err) {
+            console.error("Preview failed:", err);
+            setError("Failed to generate preview. The file format might be invalid.");
+        } finally {
+            setProcessingPreview(false);
+        }
     };
 
     const handleUpload = async () => {
@@ -685,6 +839,9 @@ function UploadView({ setActiveTab }) {
             });
 
             setResult(result);
+            if (onUploadSuccess) {
+                onUploadSuccess();
+            }
         } catch (err) {
             console.error("Upload failed:", err);
             setError(err.response?.data?.detail?.message || "Failed to upload file. Please try again.");
@@ -696,6 +853,7 @@ function UploadView({ setActiveTab }) {
     const resetUpload = () => {
         setFiles([]);
         setResult(null);
+        setPreviewResult(null);
         setError(null);
         setProgress(0);
     };
@@ -704,62 +862,165 @@ function UploadView({ setActiveTab }) {
         <div className="upload-view">
             <div className="upload-header">
                 <h2>Data Ingestion & Unification</h2>
-                <p>Upload raw astronomical data (FITS, CSV, JSON). The system will automatically detect the format, parse coordinates, and unify it into the COSMIC catalog.</p>
+                <p>Upload raw astronomical data (FITS, CSV, JSON). The system will preview and validate your data before ingestion.</p>
             </div>
 
             {!result ? (
                 <div className="upload-container">
-                    <div
-                        className={`drop-zone ${dragActive ? 'active' : ''} ${files.length ? 'has-file' : ''}`}
-                        onDragEnter={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
-                        onClick={() => document.getElementById('file-upload').click()}
-                    >
-                        <input
-                            type="file"
-                            id="file-upload"
-                            multiple={false}
-                            onChange={handleChange}
-                            style={{ display: 'none' }}
-                        />
-
-                        {files.length > 0 ? (
-                            <div className="file-preview">
-                                <FileText size={48} className="file-icon" />
-                                <div className="file-info">
-                                    <span className="file-name">{files[0].name}</span>
-                                    <span className="file-size">{(files[0].size / 1024).toFixed(1)} KB</span>
-                                </div>
-                                <button className="remove-file" onClick={(e) => { e.stopPropagation(); resetUpload(); }}>
-                                    <XCircle size={20} />
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="drop-prompt">
-                                <UploadCloud size={64} className="upload-icon" />
-                                <h3>Drag & Drop files here</h3>
-                                <span>or click to browse</span>
-                                <p className="supported-formats">Supported: FITS, CSV, JSON</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {files.length > 0 && (
-                        <div className="upload-actions">
-                            <button
-                                className="upload-btn"
-                                onClick={handleUpload}
-                                disabled={uploading}
+                    {!previewResult ? (
+                        <>
+                            <div
+                                className={`drop-zone ${dragActive ? 'active' : ''} ${files.length ? 'has-file' : ''}`}
+                                onDragEnter={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDragOver={handleDrag}
+                                onDrop={handleDrop}
+                                onClick={() => document.getElementById('file-upload').click()}
                             >
-                                {uploading ? `Uploading... ${progress}%` : 'Ingest Data'}
-                            </button>
-                            {uploading && (
-                                <div className="progress-bar">
-                                    <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                                <input
+                                    type="file"
+                                    id="file-upload"
+                                    multiple={false}
+                                    onChange={handleChange}
+                                    style={{ display: 'none' }}
+                                />
+
+                                {files.length > 0 ? (
+                                    <div className="file-preview">
+                                        <FileText size={48} className="file-icon" />
+                                        <div className="file-info">
+                                            <span className="file-name">{files[0].name}</span>
+                                            <span className="file-size">{(files[0].size / 1024).toFixed(1)} KB</span>
+                                        </div>
+                                        <button className="remove-file" onClick={(e) => { e.stopPropagation(); resetUpload(); }}>
+                                            <XCircle size={20} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="drop-prompt">
+                                        <UploadCloud size={64} className="upload-icon" />
+                                        <h3>Drag & Drop files here</h3>
+                                        <span>or click to browse</span>
+                                        <p className="supported-formats">Supported: FITS, CSV, JSON</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {files.length > 0 && (
+                                <div className="upload-actions">
+                                    <button
+                                        className="preview-btn"
+                                        onClick={handlePreview}
+                                        disabled={processingPreview}
+                                        style={{
+                                            background: '#3b82f6',
+                                            color: 'white',
+                                            padding: '0.8rem 2rem',
+                                            borderRadius: '8px',
+                                            border: 'none',
+                                            fontWeight: '600',
+                                            fontSize: '1rem',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            transition: 'all 0.2s ease',
+                                        }}
+                                    >
+                                        {processingPreview ? (
+                                            <>
+                                                <RefreshCw size={18} className="spin" />
+                                                Analyzing Data...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Eye size={18} />
+                                                Preview Data
+                                            </>
+                                        )}
+                                    </button>
                                 </div>
                             )}
+                        </>
+                    ) : (
+                        <div className="preview-results glass-panel" style={{ padding: '1.5rem', marginTop: '1rem' }}>
+                            <div className="preview-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                                <h3>Data Preview</h3>
+                                <div className="preview-stats" style={{ display: 'flex', gap: '1rem' }}>
+                                    <span style={{ color: '#4ade80' }}>✓ {previewResult.valid_count} Valid</span>
+                                    <span style={{ color: '#f87171' }}>⚠ {previewResult.invalid_count} Invalid</span>
+                                </div>
+                            </div>
+
+                            <div className="table-wrapper" style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ background: 'rgba(255,255,255,0.05)', textAlign: 'left' }}>
+                                            {['Source ID', 'RA (°)', 'Dec (°)', 'Mag', 'Distance (pc)'].map(h => (
+                                                <th key={h} style={{ padding: '0.75rem' }}>{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {previewResult.samples.map((row, i) => (
+                                            <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <td style={{ padding: '0.5rem 0.75rem' }}>{row.source_id}</td>
+                                                <td style={{ padding: '0.5rem 0.75rem' }}>{row.ra_deg?.toFixed(5)}</td>
+                                                <td style={{ padding: '0.5rem 0.75rem' }}>{row.dec_deg?.toFixed(5)}</td>
+                                                <td style={{ padding: '0.5rem 0.75rem' }}>{row.brightness_mag?.toFixed(2)}</td>
+                                                <td style={{ padding: '0.5rem 0.75rem' }}>{row.distance_pc?.toFixed(1) || '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {previewResult.sample_errors && previewResult.sample_errors.length > 0 && (
+                                <div className="preview-errors" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                    <h4 style={{ color: '#f87171', margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>Validation Issues Detected</h4>
+                                    <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', color: '#fca5a5' }}>
+                                        {previewResult.sample_errors.slice(0, 3).map((err, i) => (
+                                            <li key={i}>{err}</li>
+                                        ))}
+                                        {previewResult.sample_errors.length > 3 && <li>...and {previewResult.sample_errors.length - 3} more</li>}
+                                    </ul>
+                                </div>
+                            )}
+
+                            <div className="preview-actions" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+                                <button
+                                    onClick={resetUpload}
+                                    style={{
+                                        background: 'transparent',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        color: '#aaa',
+                                        padding: '0.75rem 1.5rem',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleUpload}
+                                    disabled={uploading}
+                                    style={{
+                                        background: 'linear-gradient(135deg, #e8a87c 0%, #d4683a 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '0.75rem 2rem',
+                                        borderRadius: '8px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
+                                    }}
+                                >
+                                    {uploading ? 'Ingesting...' : 'Confirm & Ingest'}
+                                    {!uploading && <CheckCircle size={18} />}
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -780,15 +1041,15 @@ function UploadView({ setActiveTab }) {
                         <div className="result-stats">
                             <div className="result-stat">
                                 <span className="label">Total Records</span>
-                                <span className="value">{result.counts?.total || 0}</span>
+                                <span className="value">{result.counts?.total || result.ingested_count + result.failed_count || 0}</span>
                             </div>
                             <div className="result-stat">
                                 <span className="label">Successfully Ingested</span>
-                                <span className="value highlight">{result.counts?.success || 0}</span>
+                                <span className="value highlight">{result.ingested_count || result.counts?.success || 0}</span>
                             </div>
                             <div className="result-stat">
                                 <span className="label">Failed/Skipped</span>
-                                <span className="value warning">{result.counts?.failed || 0}</span>
+                                <span className="value warning">{result.failed_count || result.counts?.failed || 0}</span>
                             </div>
                         </div>
 
@@ -857,8 +1118,11 @@ function Dashboard() {
         ra_max: Number(searchParams.get('ra_max')) || 360,
         dec_min: Number(searchParams.get('dec_min')) || -90,
         dec_max: Number(searchParams.get('dec_max')) || 90,
-        max_mag: Number(searchParams.get('max_mag')) || 20
+        max_mag: Number(searchParams.get('max_mag')) || 20,
+        dataset_ids: []
     });
+
+    const [datasets, setDatasets] = useState([]);
 
     const [stars, setStars] = useState([]);
     const [anomalies, setAnomalies] = useState([]);
@@ -888,12 +1152,13 @@ function Dashboard() {
         try {
             // Number() ensures we handle 0 correctly and don't get NaN
             const starsResponse = await searchStars({
-                limit: 1000,
+                limit: 5000,
                 ra_min: Number(filters.ra_min),
                 ra_max: Number(filters.ra_max),
                 dec_min: Number(filters.dec_min),
                 dec_max: Number(filters.dec_max),
-                max_mag: Number(filters.max_mag)
+                max_mag: Number(filters.max_mag),
+                dataset_ids: filters.dataset_ids && filters.dataset_ids.length > 0 ? filters.dataset_ids : undefined
             });
             setStars(starsResponse.records || []);
             setStats(prev => ({
@@ -920,10 +1185,44 @@ function Dashboard() {
             ra_max: 360,
             dec_min: -90,
             dec_max: 90,
-            max_mag: 20
+            max_mag: 20,
+            dataset_ids: []
         };
         setFilters(defaults);
         // The useEffect will pick up the change and auto-fetch
+    };
+
+    const fetchDatasets = useCallback(async () => {
+        try {
+            const data = await getDatasets();
+            setDatasets(data.datasets || []);
+        } catch (err) {
+            console.error('Failed to fetch datasets:', err);
+        }
+    }, []);
+
+    const handleDeleteDataset = async (datasetId) => {
+        if (!window.confirm('Are you sure you want to delete this dataset? This cannot be undone.')) return;
+
+        try {
+            await deleteDataset(datasetId);
+            // Refresh datasets
+            fetchDatasets();
+            // Clear from filters if selected
+            if (filters.dataset_ids.includes(datasetId)) {
+                setFilters(prev => ({
+                    ...prev,
+                    dataset_ids: prev.dataset_ids.filter(id => id !== datasetId)
+                }));
+            } else {
+                // If not selected, we still might want to refresh stars if they were visible?
+                // Actually stars might be deleted. So refresh stars.
+                fetchStarsData();
+            }
+        } catch (err) {
+            console.error('Failed to delete dataset:', err);
+            setError('Failed to delete dataset.');
+        }
     };
 
     // Auto-apply filters with debounce
@@ -952,10 +1251,13 @@ function Dashboard() {
                 // Check health first
                 await checkHealth();
 
+                // Load datasets
+                await fetchDatasets();
+
                 // Try to fetch stars first
                 let starsResponse;
                 try {
-                    starsResponse = await searchStars({ limit: 1000 });
+                    starsResponse = await searchStars({ limit: 5000 });
                 } catch (starErr) {
                     console.error('Failed to fetch stars:', starErr);
                     starsResponse = { records: [], total_count: 0 };
@@ -967,7 +1269,7 @@ function Dashboard() {
                     try {
                         await loadGaiaData();
                         // Re-fetch stars after loading
-                        starsResponse = await searchStars({ limit: 1000 });
+                        starsResponse = await searchStars({ limit: 5000 });
                     } catch (loadErr) {
                         console.error('Failed to load Gaia data:', loadErr);
                     }
@@ -1029,6 +1331,8 @@ function Dashboard() {
                 filters={filters}
                 setFilters={setFilters}
                 onResetFilters={handleResetFilters}
+                datasets={datasets}
+                onDeleteDataset={handleDeleteDataset}
                 isLoading={isLoading}
             />
 
@@ -1052,7 +1356,7 @@ function Dashboard() {
                         />
                     </div>
                 ) : activeTab === 'upload' ? (
-                    <UploadView setActiveTab={setActiveTab} />
+                    <UploadView setActiveTab={setActiveTab} onUploadSuccess={fetchDatasets} />
                 ) : activeTab === 'anomaly' ? (
                     <AILab />
                 ) : activeTab === 'harmonize' ? (

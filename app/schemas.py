@@ -124,6 +124,22 @@ class AutoIngestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class IngestPreviewResponse(BaseModel):
+    """
+    Response schema for data ingestion preview.
+    
+    Used to verify schema mapping and data quality before committing
+    to the database.
+    """
+    source_columns: List[str] = Field(description="Columns detected in the source file")
+    samples: List[dict] = Field(description="Sample records mapped to unified schema")
+    total_previewed: int = Field(description="Number of records processed for preview")
+    valid_count: int = Field(description="Number of valid records in sample")
+    invalid_count: int = Field(description="Number of invalid records in sample")
+    sample_errors: List[str] = Field(description="List of validation errors found in sample")
+    dataset_id: Optional[str] = Field(None, description="Generated dataset ID")
+
+
 # ============================================================
 # SEARCH SCHEMAS
 # ============================================================
@@ -196,6 +212,7 @@ class StarResponse(BaseModel):
     distance_pc: Optional[float] = None
     original_source: str
     raw_frame: str
+    dataset_id: Optional[str] = None
     raw_metadata: Optional[dict] = None
     created_at: datetime
 

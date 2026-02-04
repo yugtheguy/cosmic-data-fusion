@@ -5,21 +5,8 @@ import { Rocket, Mail, Lock, Eye, EyeOff, ArrowRight, User, CheckCircle } from '
 import toast from 'react-hot-toast';
 import './SignUpPage.css';
 
-// Cloud Overlay that fades out
-function CloudOverlay({ isVisible }) {
-    return (
-        <div className={`signup-cloud-overlay ${!isVisible ? 'fade-out' : ''}`}>
-            <div className="signup-cloud lc-1"></div>
-            <div className="signup-cloud lc-2"></div>
-            <div className="signup-cloud lc-3"></div>
-            <div className="signup-cloud lc-4"></div>
-            <div className="signup-cloud lc-5"></div>
-        </div>
-    );
-}
-
 // SignUp Form Component
-function SignUpForm({ isVisible }) {
+function SignUpForm() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -49,19 +36,16 @@ function SignUpForm({ isVisible }) {
     };
 
     return (
-        <AnimatePresence>
-            {isVisible && (
-                <motion.div
-                    className="signup-form-container"
-                    initial={{ opacity: 0, y: 100, scale: 0.9 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{
-                        duration: 1,
-                        delay: 0.5,
-                        ease: [0.25, 0.46, 0.45, 0.94]
-                    }}
-                >
-                    <div className="signup-card-3d">
+        <motion.div
+            className="signup-form-container"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+                duration: 0.6,
+                ease: [0.25, 0.46, 0.45, 0.94]
+            }}
+        >
+            <div className="signup-card-3d">
                         {/* Glowing border effect */}
                         <div className="card-glow"></div>
 
@@ -182,37 +166,19 @@ function SignUpForm({ isVisible }) {
                         </div>
                     </div>
                 </motion.div>
-            )}
-        </AnimatePresence>
     );
 }
 
 // Main SignUp Page Component
 function SignUpPage() {
-    const [showClouds, setShowClouds] = useState(true);
-    const [showForm, setShowForm] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
 
     useEffect(() => {
-        // Preload the Mars facility image (reusing same asset)
+        // Preload the Mars facility image
         const img = new Image();
         img.src = '/Assets/Images/mars-facility.png';
         img.onload = () => {
             setImageLoaded(true);
-
-            // Fade out clouds after image loads
-            const cloudTimer = setTimeout(() => {
-                setShowClouds(false);
-            }, 800);
-
-            const formTimer = setTimeout(() => {
-                setShowForm(true);
-            }, 1200);
-
-            return () => {
-                clearTimeout(cloudTimer);
-                clearTimeout(formTimer);
-            };
         };
     }, []);
 
@@ -227,8 +193,7 @@ function SignUpPage() {
                 <img src="/Assets/Images/mars-facility.png" alt="Mars Mining Facility" />
             </div>
 
-            <CloudOverlay isVisible={showClouds} />
-            <SignUpForm isVisible={showForm} />
+            <SignUpForm />
 
             <Link to="/" className="back-link">
                 <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} />

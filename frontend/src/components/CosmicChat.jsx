@@ -1,5 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import {
+    Bot,
+    User,
+    Sparkles,
+    Trash2,
+    Minus,
+    Send,
+    Map,
+    Clock,
+    Download,
+    MessageCircle,
+    X,
+    Maximize2
+} from 'lucide-react';
 import './CosmicChat.css';
 
 const CosmicChat = () => {
@@ -47,9 +61,14 @@ const CosmicChat = () => {
     const loadSuggestions = async () => {
         try {
             const context = getPageContext();
-            const response = await fetch(`http://localhost:8000/api/nl-query/suggestions?context=${context}`);
+            const response = await fetch(`/api/nl-query/suggestions?context=${context}`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
-            setSuggestions(data.suggestions);
+            setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
         } catch (error) {
             console.error('Failed to load suggestions:', error);
             // Fallback suggestions
@@ -124,7 +143,7 @@ const CosmicChat = () => {
 
         try {
             // Call NL Query API
-            const response = await fetch('http://localhost:8000/api/nl-query/query', {
+            const response = await fetch('/api/nl-query/query', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -186,14 +205,14 @@ const CosmicChat = () => {
         <div className="cosmic-chat-widget">
             {!isOpen ? (
                 <button className="chat-toggle-button" onClick={() => setIsOpen(true)}>
-                    <span className="chat-icon">🤖</span>
+                    <MessageCircle className="chat-icon" size={32} />
                 </button>
             ) : (
                 <div className="chat-container">
                     {/* Header */}
                     <div className="chat-header">
                         <div className="chat-title">
-                            <span className="chat-title-icon">🌌</span>
+                            <Sparkles className="chat-title-icon" size={20} />
                             <span>Cosmic AI Assistant</span>
                         </div>
                         <div className="chat-controls">
@@ -202,14 +221,14 @@ const CosmicChat = () => {
                                 onClick={handleClearChat}
                                 title="Clear conversation"
                             >
-                                🗑️
+                                <Trash2 size={16} />
                             </button>
                             <button
                                 className="chat-control-btn"
                                 onClick={() => setIsOpen(false)}
                                 title="Minimize"
                             >
-                                ➖
+                                <Minus size={16} />
                             </button>
                         </div>
                     </div>
@@ -218,7 +237,9 @@ const CosmicChat = () => {
                     <div className="chat-messages">
                         {messages.length === 0 && (
                             <div className="message ai">
-                                <div className="message-avatar">🤖</div>
+                                <div className="message-avatar">
+                                    <Bot size={20} />
+                                </div>
                                 <div className="message-content">
                                     <p>Hello! I'm your Cosmic AI Assistant. Ask me anything about stars!</p>
                                     <div className="suggestion-chips">
@@ -239,7 +260,7 @@ const CosmicChat = () => {
                         {messages.map((message) => (
                             <div key={message.id} className={`message ${message.type}`}>
                                 <div className="message-avatar">
-                                    {message.type === 'user' ? '👤' : '🤖'}
+                                    {message.type === 'user' ? <User size={20} /> : <Bot size={20} />}
                                 </div>
                                 <div className="message-content">
                                     <p>{message.content}</p>
@@ -248,7 +269,7 @@ const CosmicChat = () => {
                                     {message.results && message.results.length > 0 && (
                                         <div className="results-container">
                                             <div className="results-header">
-                                                <span className="results-icon">✨</span>
+                                                <Sparkles className="results-icon" size={14} />
                                                 <span className="results-title">Found {message.totalCount} stars</span>
                                             </div>
                                             <div className="results-cards">
@@ -289,7 +310,7 @@ const CosmicChat = () => {
                                                     console.log('Navigate to Sky Map with filters:', message.filters_applied);
                                                 }}
                                             >
-                                                🗺️ View on Sky Map
+                                                <Map size={14} /> View on Sky Map
                                             </button>
                                             <button
                                                 className="action-btn"
@@ -309,7 +330,7 @@ const CosmicChat = () => {
                                                     window.location.href = `/timemachine?${params.toString()}`;
                                                 }}
                                             >
-                                                ⏰ Open in Time Machine
+                                                <Clock size={14} /> Open in Time Machine
                                             </button>
                                             <button
                                                 className="action-btn"
@@ -319,7 +340,7 @@ const CosmicChat = () => {
                                                     downloadCSV(csv, `stars_${Date.now()}.csv`);
                                                 }}
                                             >
-                                                📥 Export CSV
+                                                <Download size={14} /> Export CSV
                                             </button>
                                         </div>
                                     )}
@@ -350,7 +371,9 @@ const CosmicChat = () => {
                         {/* Typing Indicator */}
                         {isLoading && (
                             <div className="message ai">
-                                <div className="message-avatar">🤖</div>
+                                <div className="message-avatar">
+                                    <Bot size={20} />
+                                </div>
                                 <div className="typing-indicator">
                                     <div className="typing-dot"></div>
                                     <div className="typing-dot"></div>
@@ -379,7 +402,7 @@ const CosmicChat = () => {
                                 onClick={() => handleSendMessage()}
                                 disabled={isLoading || !inputText.trim()}
                             >
-                                ➤
+                                <Send size={20} />
                             </button>
                         </div>
                     </div>
