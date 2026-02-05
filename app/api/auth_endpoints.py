@@ -8,19 +8,22 @@ with JWT token-based authentication.
 from datetime import timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
+from app.email_utils import send_welcome_email, send_verification_email
 from app.auth import (
     get_password_hash,
     authenticate_user,
     create_access_token,
     get_current_user,
     get_current_superuser,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    create_verification_token,
+    decode_access_token
 )
 from app.auth_schemas import (
     UserCreate,
@@ -36,7 +39,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=UserResponseWithToken, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+def register(user_data: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Register a new user account.
     
@@ -55,41 +58,85 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
+    
+    if existing_user and existing_user.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
-    # Create new user
+
+    # Prepare password hash
     hashed_password = get_password_hash(user_data.password)
-    new_user = User(
-        email=user_data.email,
-        hashed_password=hashed_password,
-        full_name=user_data.full_name,
-        is_active=True,
-        is_superuser=False
-    )
     
-    db.add(new_user)
+    if existing_user:
+        # Update existing unverified user
+        existing_user.hashed_password = hashed_password
+        existing_user.full_name = user_data.full_name
+        new_user = existing_user
+    else:
+        # Create new user
+        new_user = User(
+            email=user_data.email,
+            hashed_password=hashed_password,
+            full_name=user_data.full_name,
+            is_active=False, # Wait for email verification
+            is_superuser=False
+        )
+        db.add(new_user)
+    
     db.commit()
     db.refresh(new_user)
     
-    # Generate JWT token
-    access_token = create_access_token(
-        data={"sub": new_user.email},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    # Generate verification token
+    verification_token = create_verification_token(new_user.email)
+
+    # Send verification email
+    background_tasks.add_task(send_verification_email, new_user.email, verification_token)
     
+    # Return basic info without access token
     return {
         "id": new_user.id,
         "email": new_user.email,
         "full_name": new_user.full_name,
         "is_active": new_user.is_active,
         "created_at": new_user.created_at,
-        "access_token": access_token,
+        "access_token": "", # No token until verified
         "token_type": "bearer"
     }
+
+
+@router.get("/verify-email")
+async def verify_email(token: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Verify email address using the token.
+    
+    Activates the user account and sends a welcome email.
+    """
+    email = decode_access_token(token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token"
+        )
+    
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+        
+    if user.is_active:
+        return {"message": "Email already verified"}
+        
+    # Activate user
+    user.is_active = True
+    db.commit()
+    
+    # Send welcome email
+    background_tasks.add_task(send_welcome_email, user.email, user.full_name)
+    
+    return {"message": "Email verified successfully! You can now login."}
 
 
 @router.post("/login", response_model=UserResponseWithToken)

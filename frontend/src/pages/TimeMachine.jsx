@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import Plot from 'react-plotly.js';
+import { useAuth } from '../context/AuthContext';
 import {
     Clock,
     FastForward,
@@ -33,10 +34,10 @@ import {
     ChevronDown,
     ChevronRight
 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
 import TimelineController from '../components/TimelineController';
 import UncertaintyCone from '../components/UncertaintyCone';
 import ConfidenceHeatmap from '../components/ConfidenceHeatmap';
+import Sidebar from '../components/Sidebar';
 import historicalFacts from '../data/historicalFacts.json';
 import './TimeMachine.css';
 
@@ -44,6 +45,8 @@ import './TimeMachine.css';
 const API_BASE_URL = 'http://localhost:8000';
 
 function TimeMachine() {
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
     // State
     const [currentEpoch, setCurrentEpoch] = useState(2016);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -114,7 +117,6 @@ function TimeMachine() {
 
     // URL parameters for integration with NL Chat
     const [searchParams, setSearchParams] = useSearchParams();
-    const navigate = useNavigate(); // For navigation to Query Builder
 
     // Parse URL parameters on mount
     useEffect(() => {
@@ -503,19 +505,6 @@ function TimeMachine() {
         };
     }, []);
 
-    // Navigation items
-    const navItems = [
-        { id: 'overview', icon: LayoutDashboard, label: 'Dashboard', link: '/dashboard' },
-        { id: 'timemachine', icon: Clock, label: 'Time Machine', link: '/timemachine' },
-        { id: 'query', icon: Search, label: 'Query Builder', link: '/query' },
-        { id: 'results', icon: Database, label: 'Data Table', link: '/dashboard' },
-        { id: 'upload', icon: UploadCloud, label: 'Ingest Data', link: '/dashboard' },
-        { id: 'skymap', icon: Map, label: 'Sky Map', link: '/dashboard' },
-        { id: 'anomaly', icon: Brain, label: 'AI Lab', link: '/dashboard' },
-        { id: 'harmonize', icon: Link2, label: 'Harmonizer', link: '/dashboard' },
-        { id: 'export', icon: Download, label: 'Export', link: '/dashboard' },
-    ];
-
     return (
         <>
             {/* TIME WARP OVERLAY - Full screen immersive effect */}
@@ -568,11 +557,7 @@ function TimeMachine() {
                 </div>
 
                 {/* Sidebar */}
-                <Sidebar
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    navItems={navItems}
-                >
+                <Sidebar activeTab={activeTab} setActiveTab={setActiveTab}>
                     {/* Filters */}
                     <div className="sidebar-filters">
                         <div className="nav-section-label">
@@ -581,53 +566,76 @@ function TimeMachine() {
                         </div>
                         <div className="filter-controls">
                             <div className="filter-group">
-                                <label>Right Ascension (°)</label>
-                                <div className="range-inputs">
-                                    <input
-                                        type="number"
-                                        value={filters.raMin}
-                                        onChange={(e) => setFilters({ ...filters, raMin: parseFloat(e.target.value) })}
-                                        placeholder="Min RA"
-                                    />
-                                    <span>to</span>
-                                    <input
-                                        type="number"
-                                        value={filters.raMax}
-                                        onChange={(e) => setFilters({ ...filters, raMax: parseFloat(e.target.value) })}
-                                        placeholder="Max RA"
-                                    />
+                                <label>RA Min (°)</label>
+                                <div className="range-display">
+                                    <span>{filters.raMin}</span>
                                 </div>
-                            </div>
-
-                            <div className="filter-group">
-                                <label>Declination (°)</label>
-                                <div className="range-inputs">
-                                    <input
-                                        type="number"
-                                        value={filters.decMin}
-                                        onChange={(e) => setFilters({ ...filters, decMin: parseFloat(e.target.value) })}
-                                        placeholder="Min Dec"
-                                    />
-                                    <span>to</span>
-                                    <input
-                                        type="number"
-                                        value={filters.decMax}
-                                        onChange={(e) => setFilters({ ...filters, decMax: parseFloat(e.target.value) })}
-                                        placeholder="Max Dec"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="filter-group">
-                                <label>Max Magnitude</label>
                                 <input
-                                    type="number"
-                                    value={filters.maxMagnitude}
-                                    onChange={(e) => setFilters({ ...filters, maxMagnitude: parseFloat(e.target.value) })}
-                                    step="0.1"
+                                    type="range"
+                                    min="0"
+                                    max="360"
+                                    value={filters.raMin}
+                                    onChange={(e) => setFilters({ ...filters, raMin: Number(e.target.value) })}
+                                    className="range-slider"
                                 />
                             </div>
-
+                            <div className="filter-group">
+                                <label>RA Max (°)</label>
+                                <div className="range-display">
+                                    <span>{filters.raMax}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="360"
+                                    value={filters.raMax}
+                                    onChange={(e) => setFilters({ ...filters, raMax: Number(e.target.value) })}
+                                    className="range-slider"
+                                />
+                            </div>
+                            <div className="filter-group">
+                                <label>Dec Min (°)</label>
+                                <div className="range-display">
+                                    <span>{filters.decMin}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="-90"
+                                    max="90"
+                                    value={filters.decMin}
+                                    onChange={(e) => setFilters({ ...filters, decMin: Number(e.target.value) })}
+                                    className="range-slider"
+                                />
+                            </div>
+                            <div className="filter-group">
+                                <label>Dec Max (°)</label>
+                                <div className="range-display">
+                                    <span>{filters.decMax}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="-90"
+                                    max="90"
+                                    value={filters.decMax}
+                                    onChange={(e) => setFilters({ ...filters, decMax: Number(e.target.value) })}
+                                    className="range-slider"
+                                />
+                            </div>
+                            <div className="filter-group">
+                                <label>Mag Max</label>
+                                <div className="range-display">
+                                    <span>{filters.maxMagnitude}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="20"
+                                    step="0.5"
+                                    value={filters.maxMagnitude}
+                                    onChange={(e) => setFilters({ ...filters, maxMagnitude: parseFloat(e.target.value) })}
+                                    className="range-slider"
+                                />
+                            </div>
                             <button
                                 className="apply-filters-btn"
                                 onClick={handleApplyFilters}

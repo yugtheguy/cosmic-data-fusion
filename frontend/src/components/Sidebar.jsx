@@ -1,19 +1,55 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, LogOut } from 'lucide-react';
-import './Sidebar.css';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import {
+    LayoutDashboard,
+    Map,
+    Brain,
+    Link2,
+    Download,
+    Search,
+    User,
+    Database,
+    Filter,
+    LogOut,
+    UploadCloud,
+    Target,
+    Clock
+} from 'lucide-react';
 
-/**
- * Shared Sidebar Component
- * 
- * @param {Object} props
- * @param {string} props.activeTab - The ID of the currently active tab
- * @param {Function} [props.setActiveTab] - Callback to set the active tab (if standard dashboard navigation)
- * @param {Array} props.navItems - Array of navigation items { id, icon, label, link?, external? }
- * @param {React.ReactNode} [props.children] - Additional content to render (filters, etc.)
- */
-function Sidebar({ activeTab, setActiveTab, navItems, children }) {
+function Sidebar({ 
+    activeTab, 
+    setActiveTab, 
+    filters, 
+    setFilters, 
+    onResetFilters, 
+    isLoading, 
+    datasets, 
+    onDeleteDataset,
+    children // For custom sections like Fast Movers in TimeMachine
+}) {
     const navigate = useNavigate();
+    const { user, logout } = useAuth();
+    
+    const navItems = [
+        { id: 'overview', icon: LayoutDashboard, label: 'Overview', action: 'tab' },
+        { id: 'timemachine', icon: Clock, label: 'Time Machine', link: '/timemachine' },
+        { id: 'query', icon: Search, label: 'Query Builder', link: '/query' },
+        { id: 'results', icon: Database, label: 'Data Table', action: 'tab' },
+        { id: 'upload', icon: UploadCloud, label: 'Ingest Data', action: 'tab' },
+        { id: 'skymap', icon: Map, label: 'Sky Map', action: 'tab' },
+        { id: 'anomaly', icon: Brain, label: 'AI Lab', action: 'tab' },
+        { id: 'harmonize', icon: Link2, label: 'Harmonizer', action: 'tab' },
+        { id: 'export', icon: Download, label: 'Export', action: 'tab' },
+        { id: 'planet-hunter', icon: Target, label: 'Planet Hunter', link: '/planet-hunter' },
+    ];
+
+    const handleNavClick = (item) => {
+        if (item.link) {
+            navigate(item.link);
+        } else if (item.action === 'tab') {
+            setActiveTab(item.id);
+        }
+    };
 
     return (
         <aside className="dashboard-sidebar">
@@ -27,26 +63,29 @@ function Sidebar({ activeTab, setActiveTab, navItems, children }) {
             <nav className="sidebar-nav">
                 <div className="nav-section-label">Navigation</div>
                 {navItems.map((item) => (
-                    <button
-                        key={item.id}
-                        className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                        onClick={() => {
-                            if (item.external) {
-                                window.location.href = item.link || '#';
-                            } else if (item.link) {
-                                navigate(item.link);
-                            } else if (setActiveTab) {
-                                setActiveTab(item.id);
-                            }
-                        }}
-                    >
-                        <item.icon size={18} strokeWidth={1.5} />
-                        <span>{item.label}</span>
-                    </button>
+                    item.link ? (
+                        <Link
+                            key={item.id}
+                            to={item.link}
+                            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                        >
+                            <item.icon size={18} strokeWidth={1.5} />
+                            <span>{item.label}</span>
+                        </Link>
+                    ) : (
+                        <button
+                            key={item.id}
+                            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                            onClick={() => handleNavClick(item)}
+                        >
+                            <item.icon size={18} strokeWidth={1.5} />
+                            <span>{item.label}</span>
+                        </button>
+                    )
                 ))}
             </nav>
 
-            {/* Custom Content (Filters, Fast Movers, etc.) */}
+            {/* Custom content section (filters, fast movers, etc.) */}
             {children}
 
             {/* User Section */}
@@ -55,10 +94,17 @@ function Sidebar({ activeTab, setActiveTab, navItems, children }) {
                     <User size={16} strokeWidth={1.5} />
                 </div>
                 <div className="user-info">
-                    <span className="user-name">Researcher</span>
+                    <span className="user-name">{user?.full_name || user?.email || 'Researcher'}</span>
                     <span className="user-role">Astronomer</span>
                 </div>
-                <button className="logout-btn" title="Logout">
+                <button 
+                    className="logout-btn" 
+                    title="Logout"
+                    onClick={() => {
+                        logout();
+                        navigate('/login');
+                    }}
+                >
                     <LogOut size={16} strokeWidth={1.5} />
                 </button>
             </div>

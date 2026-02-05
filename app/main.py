@@ -91,7 +91,7 @@ with automatic coordinate standardization to ICRS J2000.
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Explicit origins for better security/CORS support
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

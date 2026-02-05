@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Plot from 'react-plotly.js';
+import { useDataCache } from '../hooks/useDataCache';
+import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,
     Map,
@@ -45,8 +47,6 @@ import ResultsTable from '../components/ResultsTable';
 import Sidebar from '../components/Sidebar';
 import './Dashboard.css';
 
-
-
 // Filter Controls Component
 function FilterControls({ filters, setFilters, onResetFilters, isLoading, datasets, onDeleteDataset }) {
 
@@ -71,7 +71,7 @@ function FilterControls({ filters, setFilters, onResetFilters, isLoading, datase
                 <div className="filter-group">
                     <label>My Uploads</label>
                     <div className="dataset-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-                        {datasets.map(d => (
+                        {datasets?.map(d => (
                             <div key={d.id} className="dataset-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', flex: 1 }}>
                                     <input
@@ -80,7 +80,7 @@ function FilterControls({ filters, setFilters, onResetFilters, isLoading, datase
                                         onChange={() => toggleDataset(d.id)}
                                     />
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.name}>
-                                        {d.name.length > 15 ? d.name.substring(0, 15) + '...' : d.name}
+                                        {d.name?.length > 15 ? d.name.substring(0, 15) + '...' : d.name}
                                     </span>
                                 </label>
                                 <button
@@ -185,12 +185,42 @@ function FilterControls({ filters, setFilters, onResetFilters, isLoading, datase
 }
 
 // Header Component
-function Header({ onExport }) {
+function Header({ onExport, onRefresh, cacheStatus }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [showExportMenu, setShowExportMenu] = useState(false);
 
     return (
         <header className="dashboard-header">
+            {/* Cache Status */}
+            {cacheStatus && (
+                <div className="cache-status" style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '10px',
+                    marginRight: '20px',
+                    fontSize: '0.85rem',
+                    color: '#888'
+                }}>
+                    <span>
+                        Cache: {cacheStatus.fresh ? '✓ Fresh' : '⚠ Stale'}
+                        {cacheStatus.age && ` (${Math.floor(cacheStatus.age / 1000)}s old)`}
+                    </span>
+                    <button 
+                        onClick={onRefresh}
+                        style={{
+                            padding: '4px 8px',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            background: '#2a2a4a',
+                            color: '#fff',
+                            border: '1px solid #444',
+                            borderRadius: '4px'
+                        }}
+                    >
+                        ↻ Refresh
+                    </button>
+                </div>
+            )}
             {/* Search Bar */}
             <div className="header-search">
                 <Search size={16} strokeWidth={1.5} />
@@ -389,9 +419,7 @@ function SkyMap({ stars, anomalies, isLoading }) {
         paper_bgcolor: 'rgba(8, 8, 20, 0.95)',
         plot_bgcolor: 'rgba(12, 12, 30, 0.9)',
         font: { color: '#a0a0a0', family: 'Inter, sans-serif' },
-        margin: { t: 20, r: 20, b: 40, l: 50 },
-        preserveSelection: true,
-        autosize:true,
+        margin: { t: 30, r: 30, b: 60, l: 70 },
         xaxis: {
             title: { text: 'Right Ascension (°)', font: { size: 12, color: '#888' } },
             range: viewBounds ? viewBounds.x : [360, 0],
@@ -478,7 +506,7 @@ function SkyMap({ stars, anomalies, isLoading }) {
     };
 
     return (
-        <div className="skymap-container">
+        <div className="skymap-container enhanced">
             {/* Header */}
             <div className="skymap-header">
                 <div className="skymap-title-section">
@@ -1031,6 +1059,9 @@ function UploadView({ setActiveTab, onUploadSuccess }) {
 function Dashboard() {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
+    
+    // Cache integration
+    const { getCached, updateCache, cacheMetadata, invalidateCache, CACHE_KEYS } = useDataCache();
 
     // Initialize state from URL or defaults
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
@@ -1052,6 +1083,7 @@ function Dashboard() {
     const [stats, setStats] = useState({});
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [cacheStatus, setCacheStatus] = useState(null);
 
     // Sync state changes to URL
     useEffect(() => {
@@ -1129,6 +1161,10 @@ function Dashboard() {
 
         try {
             await deleteDataset(datasetId);
+            // Invalidate caches since data has changed
+            invalidateCache(CACHE_KEYS.STARS);
+            invalidateCache(CACHE_KEYS.DATASETS);
+            invalidateCache(CACHE_KEYS.ANOMALIES);
             // Refresh datasets
             fetchDatasets();
             // Clear from filters if selected
@@ -1147,6 +1183,34 @@ function Dashboard() {
             setError('Failed to delete dataset.');
         }
     };
+
+    // Handle upload success - invalidate caches and refresh datasets
+    const handleUploadSuccess = useCallback(() => {
+        console.log('📤 Upload successful - invalidating caches');
+        // Invalidate all caches since new data has been uploaded
+        invalidateCache(CACHE_KEYS.STARS);
+        invalidateCache(CACHE_KEYS.ANOMALIES);
+        invalidateCache(CACHE_KEYS.DATASETS);
+        invalidateCache(CACHE_KEYS.HARMONIZE_STATS);
+        // Fetch updated datasets list
+        fetchDatasets();
+        // Optionally refresh stars data
+        fetchStarsData();
+    }, [invalidateCache, CACHE_KEYS, fetchDatasets, fetchStarsData]);
+
+    // Manual refresh handler
+    const handleManualRefresh = useCallback(() => {
+        console.log('🔄 Manual refresh triggered');
+        // Invalidate all caches
+        invalidateCache(CACHE_KEYS.STARS);
+        invalidateCache(CACHE_KEYS.ANOMALIES);
+        invalidateCache(CACHE_KEYS.DATASETS);
+        invalidateCache(CACHE_KEYS.HARMONIZE_STATS);
+        // Reset cache status
+        setCacheStatus(null);
+        // Reload the page to fetch fresh data
+        window.location.reload();
+    }, [invalidateCache, CACHE_KEYS]);
 
     // Auto-apply filters with debounce
     useEffect(() => {
@@ -1171,6 +1235,42 @@ function Dashboard() {
             setError(null);
 
             try {
+                // Check cache first
+                const cachedStars = getCached(CACHE_KEYS.STARS);
+                const cachedAnomalies = getCached(CACHE_KEYS.ANOMALIES);
+                const cachedDatasets = getCached(CACHE_KEYS.DATASETS);
+                const cachedStats = getCached(CACHE_KEYS.HARMONIZE_STATS);
+
+                // If we have fresh cached data, use it
+                if (cachedStars && cachedStars.fresh) {
+                    console.log('✅ Using cached stars data');
+                    setStars(cachedStars.data.records || []);
+                    setCacheStatus(cacheMetadata[CACHE_KEYS.STARS]);
+                    
+                    if (cachedAnomalies && cachedAnomalies.fresh) {
+                        setAnomalies(cachedAnomalies.data || []);
+                    }
+                    
+                    if (cachedDatasets && cachedDatasets.fresh) {
+                        setDatasets(cachedDatasets.data || []);
+                    }
+                    
+                    if (cachedStats && cachedStats.fresh) {
+                        const cachedStatsData = cachedStats.data;
+                        setStats({
+                            totalStars: cachedStars.data.total_count || cachedStars.data.records?.length || 0,
+                            fusionGroups: cachedStatsData.unique_fusion_groups || 0,
+                            anomalyCount: cachedAnomalies?.data?.length || 0,
+                            sources: 2,
+                        });
+                    }
+                    
+                    setIsLoading(false);
+                    return; // Skip API calls
+                }
+
+                console.log('🔄 Fetching fresh data from API');
+
                 // Check health first
                 await checkHealth();
 
@@ -1181,21 +1281,16 @@ function Dashboard() {
                 let starsResponse;
                 try {
                     starsResponse = await searchStars({ limit: 5000 });
+                    // Cache the response
+                    updateCache(CACHE_KEYS.STARS, starsResponse);
                 } catch (starErr) {
                     console.error('Failed to fetch stars:', starErr);
                     starsResponse = { records: [], total_count: 0 };
                 }
 
-                // If no stars, try to load Gaia data automatically
+                // If no stars, just show empty message (bundled data is disabled)
                 if (!starsResponse.records?.length || starsResponse.total_count === 0) {
-                    console.log('No star data found, loading Gaia sample data...');
-                    try {
-                        await loadGaiaData();
-                        // Re-fetch stars after loading
-                        starsResponse = await searchStars({ limit: 5000 });
-                    } catch (loadErr) {
-                        console.error('Failed to load Gaia data:', loadErr);
-                    }
+                    console.log('No star data found. Upload your own datasets to get started!');
                 }
 
                 setStars(starsResponse.records || []);
@@ -1204,6 +1299,8 @@ function Dashboard() {
                 let anomaliesResponse = { anomalies: [], anomaly_count: 0 };
                 try {
                     anomaliesResponse = await detectAnomalies(0.05);
+                    // Cache anomalies
+                    updateCache(CACHE_KEYS.ANOMALIES, anomaliesResponse.anomalies || []);
                 } catch (anomalyErr) {
                     // Handle insufficient data gracefully
                     console.warn('Anomaly detection failed (likely insufficient data):', anomalyErr);
@@ -1215,6 +1312,8 @@ function Dashboard() {
                 let statsResponse = { unique_fusion_groups: 0 };
                 try {
                     statsResponse = await getHarmonizationStats();
+                    // Cache stats
+                    updateCache(CACHE_KEYS.HARMONIZE_STATS, statsResponse);
                 } catch (statsErr) {
                     console.warn('Harmonization stats failed:', statsErr);
                 }
@@ -1225,6 +1324,8 @@ function Dashboard() {
                     anomalyCount: anomaliesResponse.anomaly_count || 0,
                     sources: 2, // Gaia + TESS
                 });
+
+                setCacheStatus(cacheMetadata[CACHE_KEYS.STARS]);
 
             } catch (err) {
                 console.error('Failed to fetch data:', err);
@@ -1246,26 +1347,11 @@ function Dashboard() {
         }
     };
 
-    // Navigation Items
-    const navItems = [
-        { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
-        { id: 'timemachine', icon: Clock, label: 'Time Machine', link: '/timemachine' },
-        { id: 'query', icon: Search, label: 'Query Builder', link: '/query' },
-        { id: 'results', icon: Database, label: 'Data Table' },
-        { id: 'upload', icon: UploadCloud, label: 'Ingest Data' },
-        { id: 'skymap', icon: Map, label: 'Sky Map' },
-        { id: 'anomaly', icon: Brain, label: 'AI Lab' },
-        { id: 'harmonize', icon: Link2, label: 'Harmonizer' },
-        { id: 'export', icon: Download, label: 'Export' },
-        { id: 'planet-hunter', icon: Target, label: 'Planet Hunter', link: '/planet-hunter' },
-    ];
-
     return (
         <div className="dashboard">
             <Sidebar
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
-                navItems={navItems}
             >
                 {/* Filters Section */}
                 <div className="sidebar-filters">
@@ -1283,8 +1369,13 @@ function Dashboard() {
                     />
                 </div>
             </Sidebar>
+
             <main className="dashboard-main">
-                <Header onExport={handleExport} />
+                <Header 
+                    onExport={handleExport} 
+                    onRefresh={handleManualRefresh}
+                    cacheStatus={cacheStatus}
+                />
 
                 {error ? (
                     <div className="error-banner">
@@ -1303,7 +1394,7 @@ function Dashboard() {
                         />
                     </div>
                 ) : activeTab === 'upload' ? (
-                    <UploadView setActiveTab={setActiveTab} onUploadSuccess={fetchDatasets} />
+                    <UploadView setActiveTab={setActiveTab} onUploadSuccess={handleUploadSuccess} />
                 ) : activeTab === 'anomaly' ? (
                     <AILab />
                 ) : activeTab === 'harmonize' ? (

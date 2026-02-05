@@ -28,13 +28,19 @@ function SignUpForm() {
         setIsLoading(true);
 
         try {
-            await register({
+            const result = await register({
                 email,
                 password,
                 full_name: name
             });
-            toast.success("Account created successfully!");
-            navigate('/dashboard');
+
+            if (result.requiresVerification) {
+                toast.success("Account created! Please check your email to verify.", { duration: 6000 });
+                navigate('/login');
+            } else {
+                toast.success("Account created successfully!");
+                navigate('/dashboard');
+            }
         } catch (error) {
             toast.error(error.message);
         } finally {

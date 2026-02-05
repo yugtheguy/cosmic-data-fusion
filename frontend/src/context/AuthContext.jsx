@@ -49,17 +49,21 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             const data = await apiRegister(userData);
-            localStorage.setItem('token', data.access_token);
-            setIsAuthenticated(true);
 
-            // User data is returned in register response, but getting fresh profile is safer
-            // Or use the response data directly if it matches the user profile shape
-            setUser({
-                id: data.id,
-                email: data.email,
-                full_name: data.full_name,
-                is_active: data.is_active
-            });
+            if (data.access_token) {
+                localStorage.setItem('token', data.access_token);
+                setIsAuthenticated(true);
+                setUser({
+                    id: data.id,
+                    email: data.email,
+                    full_name: data.full_name,
+                    is_active: data.is_active
+                });
+                return { success: true, requiresVerification: false };
+            } else {
+                // Email verification flow - no token yet
+                return { success: true, requiresVerification: true };
+            }
 
             return true;
         } catch (error) {

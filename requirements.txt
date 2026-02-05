@@ -41,3 +41,5 @@ matplotlib>=3.7.0
 
 # Progress bars (optional, for data fetching scripts)
 tqdm>=4.66.0
+# Email
+fastapi-mail>=1.4.1
