@@ -11,10 +11,12 @@ Run with: uvicorn app.main:app --reload
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.database import init_db
 from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors, analytics, temporal, natural_query, auth_endpoints
@@ -86,6 +88,13 @@ with automatic coordinate standardization to ICRS J2000.
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
+)
+
+# Add SessionMiddleware for OAuth (must be added before CORS)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SECRET_KEY", "dev_secret_key_change_in_production"),
+    max_age=3600  # Session expires after 1 hour
 )
 
 # Configure CORS

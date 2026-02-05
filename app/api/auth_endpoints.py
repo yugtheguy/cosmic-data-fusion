@@ -5,16 +5,19 @@ Provides user registration, login, and profile management endpoints
 with JWT token-based authentication.
 """
 
+import os
 from datetime import timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
 from app.email_utils import send_welcome_email, send_verification_email
+from app.oauth import oauth
 from app.auth import (
     get_password_hash,
     authenticate_user,
@@ -333,3 +336,81 @@ async def delete_user(
     db.commit()
     
     return {"message": f"User {user.email} deactivated successfully"}
+
+# Google OAuth endpoints
+@router.get("/google/login")
+async def google_login(request: Request):
+    """
+    Initiate Google OAuth login flow.
+    Redirects user to Google's consent screen.
+    """
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    redirect_uri = request.url_for('google_callback')
+    
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    """
+    Handle Google OAuth callback.
+    Exchanges authorization code for token, gets user info,
+    and creates/logs in the user.
+    """
+    try:
+        # Exchange authorization code for access token
+        token = await oauth.google.authorize_access_token(request)
+        
+        # Get user info from Google
+        user_info = token.get('userinfo')
+        if not user_info:
+            # If userinfo not in token, fetch it
+            user_info = await oauth.google.userinfo(token=token)
+        
+        email = user_info.get('email')
+        name = user_info.get('name', email.split('@')[0])
+        
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email not provided by Google"
+            )
+        
+        # Check if user exists
+        user = db.query(User).filter(User.email == email).first()
+        
+        if not user:
+            # Create new user with OAuth
+            user = User(
+                email=email,
+                full_name=name,
+                hashed_password="",  # OAuth users don't have password
+                is_active=True  # Google emails are pre-verified
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            # Update existing user to mark as active if not already
+            if not user.is_active:
+                user.is_active = True
+                db.commit()
+        
+        # Create access token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+        
+        # Redirect to frontend with token
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        return RedirectResponse(
+            url=f"{frontend_url}/oauth-callback?token={access_token}"
+        )
+        
+    except Exception as e:
+        # Redirect to frontend with error
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        return RedirectResponse(
+            url=f"{frontend_url}/login?error=oauth_failed"
+        )

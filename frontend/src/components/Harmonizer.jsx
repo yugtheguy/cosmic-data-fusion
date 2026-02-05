@@ -12,7 +12,12 @@ import {
     Activity,
     RefreshCw,
     Eye,
-    Atom
+    Atom,
+    List,
+    Network,
+    Search,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import { runCrossMatch, getHarmonizationStats, getFusionGroups, getFusionGroup } from '../services/api';
 import toast from 'react-hot-toast';
@@ -179,9 +184,16 @@ function Harmonizer() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [stats, setStats] = useState(null);
-    const [groups, setGroups] = useState([]); // Real groups list
+    const [groups, setGroups] = useState([]); // Groups for visualization (limited)
+    const [allGroups, setAllGroups] = useState([]); // All groups for table view
     const [matchRadius, setMatchRadius] = useState(2.0);
     const [lastRun, setLastRun] = useState(null);
+
+    // View mode state
+    const [viewMode, setViewMode] = useState('network'); // 'network' or 'table'
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const groupsPerPage = 50;
 
     // Selection state
     const [selectedGroup, setSelectedGroup] = useState(null);
@@ -230,12 +242,14 @@ function Harmonizer() {
 
     const loadData = async () => {
         try {
-            const [statsData, groupsData] = await Promise.all([
+            const [statsData, vizGroupsData, allGroupsData] = await Promise.all([
                 getHarmonizationStats(),
-                getFusionGroups(50) // Load top 50 groups for viz
+                getFusionGroups(100), // Limited for clean visualization
+                getFusionGroups(10000) // Get all groups for table view
             ]);
             setStats(statsData);
-            setGroups(groupsData);
+            setGroups(vizGroupsData);
+            setAllGroups(allGroupsData);
         } catch (err) {
             console.error('Failed to load harmonization data:', err);
         }
@@ -270,6 +284,28 @@ function Harmonizer() {
             setLoadingGroup(false);
         }
     };
+
+    // Filter and paginate groups for table view
+    const filteredGroups = allGroups.filter(group => {
+        if (!searchTerm) return true;
+        const term = searchTerm.toLowerCase();
+        return (
+            group.label?.toLowerCase().includes(term) ||
+            group.id?.toLowerCase().includes(term) ||
+            group.star_count?.toString().includes(term)
+        );
+    });
+
+    const totalPages = Math.ceil(filteredGroups.length / groupsPerPage);
+    const paginatedGroups = filteredGroups.slice(
+        (currentPage - 1) * groupsPerPage,
+        currentPage * groupsPerPage
+    );
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     return (
         <div className="harmonizer">
@@ -342,16 +378,126 @@ function Harmonizer() {
 
                 {/* Center: Network Visualization */}
                 <div className="visualization-panel glass-panel">
-                    <h3><Link2 size={18} /> Fusion Network</h3>
-                    {groups.length > 0 ? (
-                        <FusionNetwork
-                            groups={groups}
-                            onSelectGroup={handleGroupSelect}
-                        />
+                    <div className="viz-header">
+                        <h3><Link2 size={18} /> Fusion Network</h3>
+                        <div className="viz-controls">
+                            <div className="view-toggle">
+                                <button
+                                    className={`toggle-btn ${viewMode === 'network' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('network')}
+                                    title="Network View"
+                                >
+                                    <Network size={16} />
+                                </button>
+                                <button
+                                    className={`toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('table')}
+                                    title="Table View"
+                                >
+                                    <List size={16} />
+                                </button>
+                            </div>
+                            {groups.length > 0 && stats?.unique_fusion_groups && (
+                                <span className="viz-count">
+                                    {viewMode === 'network' 
+                                        ? `Showing ${groups.length} of ${stats.unique_fusion_groups.toLocaleString()} groups`
+                                        : `${stats.unique_fusion_groups.toLocaleString()} total groups`
+                                    }
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {viewMode === 'network' ? (
+                        groups.length > 0 ? (
+                            <FusionNetwork
+                                groups={groups}
+                                onSelectGroup={handleGroupSelect}
+                            />
+                        ) : (
+                            <div className="empty-viz">
+                                <Atom size={48} />
+                                <p>Run cross-match to generate fusion groups</p>
+                            </div>
+                        )
                     ) : (
-                        <div className="empty-viz">
-                            <Atom size={48} />
-                            <p>Run cross-match to generate fusion groups</p>
+                        <div className="groups-table-container">
+                            <div className="table-controls">
+                                <div className="search-box">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search groups by ID or star count..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            
+                            {allGroups.length > 0 ? (
+                                <>
+                                    <div className="groups-table">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Group Label</th>
+                                                    <th>Stars</th>
+                                                    <th>Position</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedGroups.map((group, idx) => (
+                                                    <tr key={group.id}>
+                                                        <td>{(currentPage - 1) * groupsPerPage + idx + 1}</td>
+                                                        <td className="group-label">{group.label}</td>
+                                                        <td><span className="star-badge">{group.star_count}</span></td>
+                                                        <td className="position-cell">
+                                                            RA {group.ra?.toFixed(2)}°, Dec {group.dec?.toFixed(2)}°
+                                                        </td>
+                                                        <td>
+                                                            <button
+                                                                className="view-btn"
+                                                                onClick={() => handleGroupSelect(group)}
+                                                            >
+                                                                <Eye size={14} /> View
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    {totalPages > 1 && (
+                                        <div className="pagination">
+                                            <button
+                                                className="page-btn"
+                                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                                disabled={currentPage === 1}
+                                            >
+                                                <ChevronLeft size={16} />
+                                            </button>
+                                            <span className="page-info">
+                                                Page {currentPage} of {totalPages} ({filteredGroups.length} groups)
+                                            </span>
+                                            <button
+                                                className="page-btn"
+                                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                                disabled={currentPage === totalPages}
+                                            >
+                                                <ChevronRight size={16} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="empty-table">
+                                    <List size={48} />
+                                    <p>No fusion groups yet</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

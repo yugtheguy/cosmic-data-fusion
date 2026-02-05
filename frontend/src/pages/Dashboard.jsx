@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Plot from 'react-plotly.js';
-import { useDataCache } from '../hooks/useDataCache';
+import { useDataCache } from '../contexts/DataCacheContext';
 import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,

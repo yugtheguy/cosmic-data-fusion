@@ -15,7 +15,27 @@ function SignUpForm() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
-    const { register } = useAuth();
+    const { register, login } = useAuth();
+
+    // Listen for OAuth popup messages
+    useEffect(() => {
+        const handleMessage = (event) => {
+            // Verify origin for security
+            if (event.origin !== window.location.origin) return;
+
+            if (event.data.type === 'oauth-success') {
+                const { token, userData } = event.data;
+                login(userData, token);
+                toast.success(`Welcome, ${userData.full_name}!`);
+                navigate('/dashboard');
+            } else if (event.data.type === 'oauth-error') {
+                toast.error(event.data.error);
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [login, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -164,11 +184,24 @@ function SignUpForm() {
                 </div>
 
                 <div className="social-login">
-                    <button className="social-button">
+                    <button 
+                        className="social-button"
+                        onClick={() => {
+                            const width = 500;
+                            const height = 600;
+                            const left = window.screen.width / 2 - width / 2;
+                            const top = window.screen.height / 2 - height / 2;
+                            window.open(
+                                'http://localhost:8000/auth/google/login',
+                                'Google Login',
+                                `width=${width},height=${height},left=${left},top=${top}`
+                            );
+                        }}
+                    >
                         <img src="https://www.google.com/favicon.ico" alt="Google" width="18" height="18" style={{ filter: 'grayscale(100%) brightness(200%)' }} />
                         Google
                     </button>
-                    <button className="social-button">
+                    <button className="social-button" disabled style={{opacity: 0.5, cursor: 'not-allowed'}}>
                         <img src="https://github.com/favicon.ico" alt="GitHub" width="18" height="18" style={{ filter: 'invert(1)' }} />
                         GitHub
                     </button>

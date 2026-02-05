@@ -11,6 +11,7 @@ import PlanetHunter from './pages/PlanetHunter';
 import TimeMachine from './pages/TimeMachine';
 import QueryBuilder from './pages/QueryBuilder';
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import OAuthCallbackPage from './pages/OAuthCallbackPage';
 import CosmicChat from './components/CosmicChat';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
                         <Route path="/planet-hunter" element={<PlanetHunter />} />
                         <Route path="/star/:id" element={<StarDetailPage />} />
                         <Route path="/verify-email" element={<VerifyEmailPage />} />
+                        <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
                     </Routes>
                     {/* Site-wide AI Chat Widget */}
                     <CosmicChat />
