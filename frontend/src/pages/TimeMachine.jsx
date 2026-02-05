@@ -33,6 +33,7 @@ import {
     ChevronDown,
     ChevronRight
 } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
 import TimelineController from '../components/TimelineController';
 import UncertaintyCone from '../components/UncertaintyCone';
 import ConfidenceHeatmap from '../components/ConfidenceHeatmap';
@@ -567,39 +568,11 @@ function TimeMachine() {
                 </div>
 
                 {/* Sidebar */}
-                <aside className="dashboard-sidebar">
-                    {/* Logo */}
-                    <div className="sidebar-logo">
-                        <div className="logo-mark">C</div>
-                        <span className="logo-text">COSMIC</span>
-                    </div>
-
-                    {/* Navigation */}
-                    <nav className="sidebar-nav">
-                        <div className="nav-section-label">Navigation</div>
-                        {navItems.map((item) => (
-                            item.link ? (
-                                <Link
-                                    key={item.id}
-                                    to={item.link}
-                                    className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                                >
-                                    <item.icon size={18} strokeWidth={1.5} />
-                                    <span>{item.label}</span>
-                                </Link>
-                            ) : (
-                                <button
-                                    key={item.id}
-                                    className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                                    onClick={() => setActiveTab(item.id)}
-                                >
-                                    <item.icon size={18} strokeWidth={1.5} />
-                                    <span>{item.label}</span>
-                                </button>
-                            )
-                        ))}
-                    </nav>
-
+                <Sidebar
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    navItems={navItems}
+                >
                     {/* Filters */}
                     <div className="sidebar-filters">
                         <div className="nav-section-label">
@@ -711,21 +684,7 @@ function TimeMachine() {
                             </div>
                         )}
                     </div>
-
-                    {/* User Section */}
-                    <div className="sidebar-user">
-                        <div className="user-avatar">
-                            <User size={18} />
-                        </div>
-                        <div className="user-info">
-                            <div className="user-name">Researcher</div>
-                            <div className="user-role">Temporal Analysis</div>
-                        </div>
-                        <button className="logout-btn">
-                            <LogOut size={18} />
-                        </button>
-                    </div>
-                </aside>
+                </Sidebar>
 
                 {/* Main Content */}
                 <main className="dashboard-main">

@@ -4,8 +4,11 @@
 .signup-page-container {
     position: relative;
     width: 100vw;
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    /* Allow height to grow */
+    overflow-x: hidden;
+    overflow-y: auto;
+    /* Enable vertical scrolling */
     background: #1a0a05;
 }
 
@@ -151,35 +154,49 @@
 }
 
 /* Signup Form Container */
+/* Signup Form Container */
 .signup-form-container {
-    position: fixed;
-    top: 3.5%;
-    right: 8%;
-    left: auto;
+    position: absolute;
+    /* Changed from fixed */
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 100vh;
     z-index: 20;
     display: flex;
     align-items: center;
     justify-content: center;
-    max-height: 93vh;
+    /* Center horizontally */
+    padding: 2rem 0;
+    /* Add top/bottom padding for small screens */
+    pointer-events: none;
+    /* Let clicks pass through container to background if needed, but card needs pointer-events: auto */
 }
 
-@media (min-width: 1600px) {
+/* Specific positioning for large screens if we want it off-center, BUT let's stick to center for safety first */
+@media (min-width: 1200px) {
     .signup-form-container {
-        right: 12%;
+        justify-content: flex-end;
+        /* Align right on large screens */
+        padding-right: 10%;
     }
 }
 
 .signup-card-3d {
     position: relative;
-    width: 400px;
+    pointer-events: auto;
+    /* Re-enable pointer events */
+    width: 340px;
+    /* Reduced width */
     max-width: 90vw;
-    max-height: 93vh;
-    overflow: auto;
+    /* Remove restricted height to avoid internal scrollbar if possible,
+       but keep a safeguard. Better to fit content naturally. */
     background: rgba(10, 15, 30, 0.75);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 0.85rem;
+    border-radius: 16px;
+    padding: 0.8rem;
+    /* Further reduced padding */
     box-shadow:
         0 25px 50px rgba(0, 0, 0, 0.5),
         0 0 100px rgba(99, 102, 241, 0.1),
@@ -220,14 +237,15 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.2rem;
 }
 
 .logo-icon-wrapper {
-    width: 36px;
-    height: 36px;
+    width: 28px;
+    /* Smaller */
+    height: 28px;
     background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-    border-radius: 10px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -237,7 +255,8 @@
 
 .logo-text {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.75rem;
+    font-size: 1.3rem;
+    /* Smaller */
     font-weight: 700;
     background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
     -webkit-background-clip: text;
@@ -247,25 +266,26 @@
 
 .signup-title {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     font-weight: 600;
     color: #fff;
     text-align: center;
-    margin-bottom: 0.05rem;
+    margin-bottom: 0;
 }
 
 .signup-subtitle {
     font-family: 'Inter', sans-serif;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.6);
     text-align: center;
-    margin-bottom: 0.9rem;
+    margin-bottom: 0.5rem;
 }
 
 .signup-form {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0rem;
+    /* Zero gap */
 }
 
 .form-group {
@@ -276,22 +296,28 @@
 
 .form-label {
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.82rem;
+    gap: 0.1rem;
+    font-size: 0.75rem;
+    /* Smaller label */
     font-weight: 500;
     color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 0;
+    /* Enhance line height */
 }
 
 .form-input {
     width: 100%;
-    padding: 0.7rem 0.95rem;
+    padding: 0.5rem 0.7rem;
+    /* Smaller padding */
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
+    border-radius: 8px;
+    /* Tighter radius */
     color: #fff;
     font-family: 'Inter', sans-serif;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     transition: all 0.3s ease;
 }
 
@@ -343,7 +369,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    margin-top: 0.3rem;
+    margin-top: 0.5rem; /* Add margin here since form gap is 0 */
 }
 
 .signup-button:hover:not(:disabled) {
@@ -461,13 +487,10 @@
     }
 
     .signup-form-container {
-        position: fixed;
-        top: 2.5%;
-        right: 50%;
-        transform: translateX(50%);
-        width: 100%;
-        padding: 1rem;
-        max-height: 95vh;
+        justify-content: center;
+        /* Center on mobile */
+        padding-right: 0;
+        /* Remove large screen padding */
     }
 
     .back-link {

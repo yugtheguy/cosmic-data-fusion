@@ -53,6 +53,10 @@ export default defineConfig({
       '/errors': {
         target: 'http://localhost:8000',
         changeOrigin: true
+      },
+      '/auth': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
       }
     }
   }

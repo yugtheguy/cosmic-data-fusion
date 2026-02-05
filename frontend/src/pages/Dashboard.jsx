@@ -42,89 +42,10 @@ import SchemaMapper from '../components/SchemaMapper';
 import AILab from '../components/AILab';
 import Harmonizer from '../components/Harmonizer';
 import ResultsTable from '../components/ResultsTable';
+import Sidebar from '../components/Sidebar';
 import './Dashboard.css';
 
-// Sidebar Navigation Component
-function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters, isLoading, datasets, onDeleteDataset }) {
-    const navigate = useNavigate();
-    const navItems = [
-        { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
-        { id: 'timemachine', icon: Clock, label: 'Time Machine', link: '/timemachine' },
-        { id: 'query', icon: Search, label: 'Query Builder' },
-        { id: 'results', icon: Database, label: 'Data Table' },
-        { id: 'upload', icon: UploadCloud, label: 'Ingest Data' },
-        { id: 'skymap', icon: Map, label: 'Sky Map' },
-        { id: 'anomaly', icon: Brain, label: 'AI Lab' },
-        { id: 'harmonize', icon: Link2, label: 'Harmonizer' },
-        { id: 'export', icon: Download, label: 'Export' },
-        { id: 'planet-hunter', icon: Target, label: 'Planet Hunter', external: true },
-    ];
 
-    return (
-        <aside className="dashboard-sidebar">
-            {/* Logo */}
-            <div className="sidebar-logo">
-                <div className="logo-mark">C</div>
-                <span className="logo-text">COSMIC</span>
-            </div>
-
-            {/* Navigation */}
-            <nav className="sidebar-nav">
-                <div className="nav-section-label">Navigation</div>
-                {navItems.map((item) => (
-                    <button
-                        key={item.id}
-                        className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                        onClick={() => {
-                            if (item.link) {
-                                navigate(item.link);
-                            } else if (item.id === 'query') {
-                                navigate('/query');
-                            } else if (item.id === 'planet-hunter') {
-                                navigate('/planet-hunter');
-                            } else {
-                                setActiveTab(item.id);
-                            }
-                        }}
-                    >
-                        <item.icon size={18} strokeWidth={1.5} />
-                        <span>{item.label}</span>
-                    </button>
-                ))}
-            </nav>
-
-            {/* Filters Section */}
-            <div className="sidebar-filters">
-                <div className="nav-section-label">
-                    <Filter size={14} strokeWidth={1.5} />
-                    Filters
-                </div>
-                <FilterControls
-                    filters={filters}
-                    setFilters={setFilters}
-                    onResetFilters={onResetFilters}
-                    isLoading={isLoading}
-                    datasets={datasets}
-                    onDeleteDataset={onDeleteDataset}
-                />
-            </div>
-
-            {/* User Section */}
-            <div className="sidebar-user">
-                <div className="user-avatar">
-                    <User size={16} strokeWidth={1.5} />
-                </div>
-                <div className="user-info">
-                    <span className="user-name">Researcher</span>
-                    <span className="user-role">Astronomer</span>
-                </div>
-                <button className="logout-btn" title="Logout">
-                    <LogOut size={16} strokeWidth={1.5} />
-                </button>
-            </div>
-        </aside>
-    );
-}
 
 // Filter Controls Component
 function FilterControls({ filters, setFilters, onResetFilters, isLoading, datasets, onDeleteDataset }) {
@@ -468,7 +389,9 @@ function SkyMap({ stars, anomalies, isLoading }) {
         paper_bgcolor: 'rgba(8, 8, 20, 0.95)',
         plot_bgcolor: 'rgba(12, 12, 30, 0.9)',
         font: { color: '#a0a0a0', family: 'Inter, sans-serif' },
-        margin: { t: 30, r: 30, b: 60, l: 70 },
+        margin: { t: 20, r: 20, b: 40, l: 50 },
+        preserveSelection: true,
+        autosize:true,
         xaxis: {
             title: { text: 'Right Ascension (°)', font: { size: 12, color: '#888' } },
             range: viewBounds ? viewBounds.x : [360, 0],
@@ -555,7 +478,7 @@ function SkyMap({ stars, anomalies, isLoading }) {
     };
 
     return (
-        <div className="skymap-container enhanced">
+        <div className="skymap-container">
             {/* Header */}
             <div className="skymap-header">
                 <div className="skymap-title-section">
@@ -1323,19 +1246,43 @@ function Dashboard() {
         }
     };
 
+    // Navigation Items
+    const navItems = [
+        { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+        { id: 'timemachine', icon: Clock, label: 'Time Machine', link: '/timemachine' },
+        { id: 'query', icon: Search, label: 'Query Builder', link: '/query' },
+        { id: 'results', icon: Database, label: 'Data Table' },
+        { id: 'upload', icon: UploadCloud, label: 'Ingest Data' },
+        { id: 'skymap', icon: Map, label: 'Sky Map' },
+        { id: 'anomaly', icon: Brain, label: 'AI Lab' },
+        { id: 'harmonize', icon: Link2, label: 'Harmonizer' },
+        { id: 'export', icon: Download, label: 'Export' },
+        { id: 'planet-hunter', icon: Target, label: 'Planet Hunter', link: '/planet-hunter' },
+    ];
+
     return (
         <div className="dashboard">
             <Sidebar
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
-                filters={filters}
-                setFilters={setFilters}
-                onResetFilters={handleResetFilters}
-                datasets={datasets}
-                onDeleteDataset={handleDeleteDataset}
-                isLoading={isLoading}
-            />
-
+                navItems={navItems}
+            >
+                {/* Filters Section */}
+                <div className="sidebar-filters">
+                    <div className="nav-section-label">
+                        <Filter size={14} strokeWidth={1.5} />
+                        Filters
+                    </div>
+                    <FilterControls
+                        filters={filters}
+                        setFilters={setFilters}
+                        onResetFilters={handleResetFilters}
+                        isLoading={isLoading}
+                        datasets={datasets}
+                        onDeleteDataset={handleDeleteDataset}
+                    />
+                </div>
+            </Sidebar>
             <main className="dashboard-main">
                 <Header onExport={handleExport} />
 
