@@ -299,6 +299,14 @@ function AILab() {
                                     </div>
                                 </div>
 
+                                {/* Phase 4: Analysis Note (Soft Warning) */}
+                                {clusterResult.analysis_note && (
+                                    <div className="analysis-note-banner">
+                                        <AlertCircle size={18} />
+                                        <span>{clusterResult.analysis_note}</span>
+                                    </div>
+                                )}
+
                                 <div className="plot-container">
                                     <Plot
                                         data={getClusterPlotData()}
@@ -417,6 +425,14 @@ function AILab() {
                                     <span className="stat-label">Contamination</span>
                                 </div>
                             </div>
+
+                            {/* Phase 4: Analysis Note (Soft Warning) */}
+                            {anomalyResult.analysis_note && (
+                                <div className="analysis-note-banner">
+                                    <AlertCircle size={18} />
+                                    <span>{anomalyResult.analysis_note}</span>
+                                </div>
+                            )}
 
                             <div className="plot-container">
                                 <Plot

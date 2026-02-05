@@ -1,6 +1,7 @@
 """
 Natural Language Query API Endpoint
 Accepts plain English queries and returns star data
+Enhanced with optional AI Research Assistant
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -9,11 +10,16 @@ from sqlalchemy import and_, or_
 from app.database import SessionLocal
 from app.models import UnifiedStarCatalog
 from app.services.nl_query_service import NLQueryParser
+from app.services.ai_research_assistant import AIResearchAssistant
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/nl-query", tags=["Natural Language Query"])
 
-# Initialize parser
+# Initialize parser and optional AI assistant
 nl_parser = NLQueryParser()
+ai_assistant = AIResearchAssistant()
 
 
 class NLQueryRequest(BaseModel):
@@ -21,6 +27,7 @@ class NLQueryRequest(BaseModel):
     query: str
     page: int = 1
     page_size: int = 100
+    ai_enhanced: bool = False  # Optional: Enable AI Research Assistant
 
 
 class NLQueryResponse(BaseModel):
@@ -31,6 +38,8 @@ class NLQueryResponse(BaseModel):
     results: List[Dict]
     total_count: int
     filters_applied: Dict
+    # AI Research Assistant fields (optional, only when ai_enhanced=True)
+    ai_analysis: Optional[Dict] = None
     suggestions: List[str]
 
 
@@ -48,6 +57,33 @@ async def natural_language_query(request: NLQueryRequest):
     try:
         # Parse the natural language query
         parsed = nl_parser.parse(request.query)
+        
+        # Check if intent is unsupported
+        if parsed.get('status') == 'UNSUPPORTED':
+            # Return educational feedback without database query
+            return NLQueryResponse(
+                intent=parsed['intent'],
+                explanation=parsed['explanation'],
+                confidence=0.0,
+                results=[],
+                total_count=0,
+                filters_applied={},
+                suggestions=parsed.get('suggestions', []),
+                ai_analysis={
+                    'unsupported_intent': True,
+                    'reason': parsed.get('reason', ''),
+                    'educational': parsed.get('educational', ''),
+                    'supported_intents': parsed.get('supported_intents', [])
+                }
+            )
+        
+        # Optional: Enhance with AI Research Assistant
+        if request.ai_enhanced:
+            try:
+                parsed = ai_assistant.enhance_query_intent(parsed)
+                logger.info(f"AI-enhanced query interpretation: {parsed.get('research_context', {})}")
+            except Exception as ai_error:
+                logger.warning(f"AI enhancement failed, continuing with standard parsing: {ai_error}")
         
         # Get database session
         db = SessionLocal()
@@ -100,11 +136,12 @@ async def natural_language_query(request: NLQueryRequest):
                 return NLQueryResponse(
                     intent=parsed['intent'],
                     explanation=f"Found {total_count} stars matching your criteria",
-                    confidence=parsed['confidence'],
+                    confidence=parsed.get('parse_confidence', 0.5),  # Use new field name
                     results=[],
                     total_count=total_count,
                     filters_applied=filters,
-                    suggestions=parsed['suggestions']
+                    suggestions=parsed['suggestions'],
+                    ai_analysis=None  # No results to analyze
                 )
             
             # Apply limit
@@ -134,14 +171,31 @@ async def natural_language_query(request: NLQueryRequest):
                 
                 results.append(result)
             
+            # Optional: Apply AI Research Assistant analysis
+            ai_analysis = None
+            if request.ai_enhanced and results:
+                try:
+                    research_context = parsed.get('research_context', {})
+                    analysis_result = ai_assistant.analyze_results(
+                        results, 
+                        research_context,
+                        parsed['intent']
+                    )
+                    ai_analysis = ai_assistant.format_for_api(analysis_result, results)
+                    logger.info(f"AI analysis complete: {len(analysis_result.get('insights', []))} insights generated")
+                except Exception as ai_error:
+                    logger.warning(f"AI analysis failed, returning standard results: {ai_error}")
+                    ai_analysis = ai_assistant.fallback_response(str(ai_error))
+            
             return NLQueryResponse(
                 intent=parsed['intent'],
                 explanation=parsed['explanation'],
-                confidence=parsed['confidence'],
+                confidence=parsed.get('parse_confidence', 0.5),  # Use new field name
                 results=results,
                 total_count=total_count,
                 filters_applied=filters,
-                suggestions=parsed['suggestions']
+                suggestions=parsed['suggestions'],
+                ai_analysis=ai_analysis
             )
         
         finally:

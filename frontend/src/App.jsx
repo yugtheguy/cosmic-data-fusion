@@ -10,7 +10,9 @@ import StarDetailPage from './pages/StarDetailPage';
 import PlanetHunter from './pages/PlanetHunter';
 import TimeMachine from './pages/TimeMachine';
 import QueryBuilder from './pages/QueryBuilder';
+import ResearchMethodology from './pages/ResearchMethodology';
 import CosmicChat from './components/CosmicChat';
+import AIResearchAssistant from './components/AIResearchAssistant';
 
 function App() {
     return (
@@ -26,6 +28,8 @@ function App() {
                     <Route path="/query" element={<QueryBuilder />} />
                     <Route path="/planet-hunter" element={<PlanetHunter />} />
                     <Route path="/star/:id" element={<StarDetailPage />} />
+                    <Route path="/research-methodology" element={<ResearchMethodology />} />
+                    <Route path="/ai-assistant" element={<AIResearchAssistant />} />
                 </Routes>
                 {/* Site-wide AI Chat Widget */}
                 <CosmicChat />

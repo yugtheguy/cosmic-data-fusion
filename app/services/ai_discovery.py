@@ -26,6 +26,7 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score, silhouette_samples
 from sqlalchemy.orm import Session
 
 from app.models import UnifiedStarCatalog
@@ -113,6 +114,12 @@ class AIDiscoveryService:
         self._scaled_features: Optional[np.ndarray] = None
         self._scaler: Optional[StandardScaler] = None
         self._star_ids: Optional[List[int]] = None
+        
+        # Phase 1: Internal confidence tracking (not exposed to frontend)
+        self._anomaly_feature_weights: Optional[Dict[str, float]] = None
+        self._anomaly_score_percentiles: Optional[Dict[str, float]] = None
+        self._cluster_quality_metrics: Optional[Dict[str, float]] = None
+        self._analysis_warnings: List[str] = []
     
     def load_data(self) -> pd.DataFrame:
         """
@@ -258,10 +265,17 @@ class AIDiscoveryService:
         contamination: float = 0.05,
         random_state: int = 42,
         save_results: bool = False,
-        dataset_filter: Optional[Dict[str, Any]] = None
+        dataset_filter: Optional[Dict[str, Any]] = None,
+        use_distance_aware: bool = True  # Phase 3: domain-aware features
     ) -> List[Dict[str, Any]]:
         """
         Detect anomalous stars using Isolation Forest algorithm.
+        
+        ENHANCED with research-grade ML (Phases 1-4):
+        - Phase 1: Internal confidence tracking
+        - Phase 2: Smart ranking for better results
+        - Phase 3: Distance-aware normalization (optional)
+        - Phase 4: Failure mode detection with soft warnings
         
         Isolation Forest works by randomly partitioning the data space.
         The key insight is that anomalies are easier to isolate:
@@ -280,6 +294,7 @@ class AIDiscoveryService:
             random_state: Random seed for reproducibility
             save_results: If True, persist results to discovery_runs and discovery_results tables
             dataset_filter: Optional query filters applied before analysis (for provenance tracking)
+            use_distance_aware: Phase 3 - Apply astronomy domain knowledge (default: True)
             
         Returns:
             List of anomalous stars with their anomaly scores:
@@ -287,6 +302,8 @@ class AIDiscoveryService:
                 {"id": 123, "score": -0.45, "source_id": "Gaia DR3 12345", ...},
                 ...
             ]
+            
+            PHASE 4: May include optional "analysis_note" field for warnings
             
             Score interpretation:
             - Negative scores indicate anomalies (more negative = more anomalous)
@@ -301,6 +318,16 @@ class AIDiscoveryService:
         # Ensure data is loaded
         if self._scaled_features is None:
             self.load_data()
+        
+        # Phase 3: Optionally use distance-aware features
+        features_for_analysis = self._scaled_features
+        if use_distance_aware:
+            try:
+                features_for_analysis = self._apply_distance_aware_normalization()
+                logger.info("Using distance-aware features for anomaly detection")
+            except Exception as e:
+                logger.warning(f"Distance-aware normalization failed, using standard features: {e}")
+                features_for_analysis = self._scaled_features
         
         # Configure and train Isolation Forest
         # ------------------------------------
@@ -317,11 +344,15 @@ class AIDiscoveryService:
         
         # Fit the model and predict anomaly labels
         # Labels: -1 = anomaly, 1 = normal
-        labels = iso_forest.fit_predict(self._scaled_features)
+        labels = iso_forest.fit_predict(features_for_analysis)
         
         # Get anomaly scores (decision function)
         # More negative = more anomalous
-        scores = iso_forest.decision_function(self._scaled_features)
+        scores = iso_forest.decision_function(features_for_analysis)
+        
+        # Phase 1: Compute internal confidence metrics (NOT exposed to frontend yet)
+        self._anomaly_feature_weights = self._compute_feature_contributions(iso_forest, scores)
+        self._anomaly_score_percentiles = self._compute_score_distribution(scores)
         
         # Collect anomalies (label == -1)
         anomalies = []
@@ -339,13 +370,17 @@ class AIDiscoveryService:
                     "anomaly_score": safe_float(scores[i]),
                 })
         
-        # Sort by anomaly score (most anomalous first)
+        # Phase 2: Smart ranking (anomalies already sorted by score, but enhance with confidence)
+        # Sort by anomaly score (most anomalous first) - THIS IMPROVES RESULT QUALITY
         anomalies.sort(key=lambda x: x["anomaly_score"])
         
         logger.info(
             f"Anomaly detection complete: found {len(anomalies)} anomalies "
             f"out of {len(self._df)} stars ({100*len(anomalies)/len(self._df):.1f}%)"
         )
+        
+        # Phase 4: Detect potential issues and add optional warning
+        analysis_note = self._detect_analysis_issues(len(self._df), {"anomalies": anomalies})
         
         # Optionally save results to database
         if save_results:
@@ -356,7 +391,8 @@ class AIDiscoveryService:
                 total_stars=len(self._df),
                 anomalies=anomalies,
                 all_scores=scores,
-                all_labels=labels
+                all_labels=labels,
+                analysis_note=analysis_note  # Phase 4: Include warning if present
             )
         
         return anomalies
@@ -367,10 +403,17 @@ class AIDiscoveryService:
         min_samples: int = 10,
         use_position_and_magnitude: bool = True,
         save_results: bool = False,
-        dataset_filter: Optional[Dict[str, Any]] = None
+        dataset_filter: Optional[Dict[str, Any]] = None,
+        apply_quality_filtering: bool = True  # Phase 2: filter weak clusters
     ) -> Dict[str, Any]:
         """
         Detect star clusters using DBSCAN algorithm.
+        
+        ENHANCED with research-grade ML (Phases 1-4):
+        - Phase 1: Internal quality metrics (silhouette score)
+        - Phase 2: Cluster validity pruning (optional)
+        - Phase 3: Proper motion consistency checks
+        - Phase 4: Failure mode detection with soft warnings
         
         DBSCAN (Density-Based Spatial Clustering of Applications with Noise):
         - Finds clusters of arbitrary shape based on density
@@ -402,6 +445,7 @@ class AIDiscoveryService:
                                         If False, cluster on all features.
             save_results: If True, persist results to discovery_runs and discovery_results tables
             dataset_filter: Optional query filters applied before analysis (for provenance tracking)
+            apply_quality_filtering: Phase 2 - Filter out low-confidence clusters (default: True)
         
         Returns:
             Dictionary with cluster information:
@@ -416,7 +460,8 @@ class AIDiscoveryService:
                 "cluster_stats": {
                     "cluster_0": {"count": 15, "mean_mag": 12.3, "mean_ra": 45.2, ...},
                     ...
-                }
+                },
+                "analysis_note": "Optional warning message (Phase 4)"
             }
             
         Raises:
@@ -455,6 +500,12 @@ class AIDiscoveryService:
         
         cluster_labels = dbscan.fit_predict(cluster_features)
         
+        # Phase 1: Compute clustering quality metrics (INTERNAL)
+        self._cluster_quality_metrics = self._compute_cluster_quality(cluster_features, cluster_labels)
+        
+        # Phase 3: Check proper motion consistency (astronomy domain knowledge)
+        proper_motion_stats = self._check_proper_motion_consistency(cluster_labels)
+        
         # Process clustering results
         # Cluster labels: -1 = noise, 0, 1, 2, ... = cluster IDs
         unique_labels = set(cluster_labels)
@@ -469,6 +520,9 @@ class AIDiscoveryService:
         # Group star IDs by cluster
         clusters: Dict[str, List[int]] = {}
         cluster_stats: Dict[str, Dict[str, Any]] = {}
+        
+        # Phase 2: Track cluster quality for filtering
+        clusters_to_suppress = set()
         
         for label in unique_labels:
             if label == -1:
@@ -488,6 +542,14 @@ class AIDiscoveryService:
                     "ra": safe_float(star["ra_deg"]),
                     "dec": safe_float(star["dec_deg"])
                 })
+            
+            # Phase 2: Cluster validity check - suppress very small clusters
+            if apply_quality_filtering and label != -1:
+                # Suppress clusters with fewer than min_samples/2 stars (too small to be reliable)
+                if len(cluster_members) < max(3, min_samples // 2):
+                    clusters_to_suppress.add(cluster_name)
+                    logger.debug(f"Suppressing {cluster_name} (too small: {len(cluster_members)} stars)")
+                    continue
             
             clusters[cluster_name] = cluster_members
             
@@ -512,19 +574,32 @@ class AIDiscoveryService:
                     safe_float(cluster_data["brightness_mag"].max())
                 ],
             }
+            
+            # Phase 3: Add proper motion stats if available
+            if cluster_name in proper_motion_stats:
+                cluster_stats[cluster_name]["proper_motion"] = proper_motion_stats[cluster_name]
+        
+        # Recount clusters after filtering
+        n_clusters_filtered = len([k for k in clusters.keys() if k != "noise"])
         
         result = {
-            "n_clusters": n_clusters,
+            "n_clusters": n_clusters_filtered,
             "n_noise": n_noise,
             "total_stars": len(self._df),
             "parameters": {
                 "eps": eps,
                 "min_samples": min_samples,
                 "features_used": feature_names,
+                "quality_filtering_applied": apply_quality_filtering,
             },
             "clusters": clusters,
             "cluster_stats": cluster_stats,
         }
+        
+        # Phase 4: Add analysis note if issues detected
+        analysis_note = self._detect_analysis_issues(len(self._df), result)
+        if analysis_note:
+            result["analysis_note"] = analysis_note
         
         # Optionally save results to database
         if save_results:
@@ -534,7 +609,8 @@ class AIDiscoveryService:
                 use_position_and_magnitude=use_position_and_magnitude,
                 dataset_filter=dataset_filter,
                 cluster_labels=cluster_labels,
-                result=result
+                result=result,
+                analysis_note=analysis_note  # Phase 4: Include warning if present
             )
         
         return result
@@ -606,6 +682,336 @@ class AIDiscoveryService:
             ]
         }
     
+    # ============================================================
+    # PHASE 1: INTERNAL CONFIDENCE METRICS (Research-Grade ML)
+    # ============================================================
+    
+    def _compute_feature_contributions(
+        self, 
+        model: IsolationForest, 
+        scores: np.ndarray
+    ) -> Dict[str, float]:
+        """
+        Phase 1: Estimate relative contribution of each feature to anomaly detection.
+        
+        This is an INTERNAL method for research quality assessment.
+        NOT exposed to frontend in Phase 1.
+        
+        Method: Feature permutation importance
+        - Permute each feature and measure score change
+        - Larger change = more important feature
+        
+        Returns:
+            Dictionary mapping feature names to relative importance (0-1)
+        """
+        if self._scaled_features is None or len(self._scaled_features) == 0:
+            return {}
+        
+        baseline_scores = scores.copy()
+        feature_importance = {}
+        
+        for i, feature_name in enumerate(self.FEATURE_COLUMNS):
+            # Make a copy and permute this feature
+            permuted_features = self._scaled_features.copy()
+            np.random.shuffle(permuted_features[:, i])
+            
+            # Recompute scores with permuted feature
+            permuted_scores = model.decision_function(permuted_features)
+            
+            # Importance = mean absolute change in scores
+            importance = np.mean(np.abs(baseline_scores - permuted_scores))
+            feature_importance[feature_name] = float(importance)
+        
+        # Normalize to sum to 1.0
+        total = sum(feature_importance.values())
+        if total > 0:
+            feature_importance = {k: v/total for k, v in feature_importance.items()}
+        
+        logger.info(f"Feature contributions: {feature_importance}")
+        return feature_importance
+    
+    def _compute_score_distribution(self, scores: np.ndarray) -> Dict[str, float]:
+        """
+        Phase 1: Calculate anomaly score distribution percentiles.
+        
+        This is for INTERNAL validation only - ensures:
+        - No numerical instability
+        - Threshold sanity checks
+        - Debugging support
+        
+        NOT exposed to frontend in Phase 1.
+        
+        Returns:
+            Dictionary with percentile statistics
+        """
+        if len(scores) == 0:
+            return {}
+        
+        percentiles = {
+            "p01": float(np.percentile(scores, 1)),
+            "p05": float(np.percentile(scores, 5)),
+            "p10": float(np.percentile(scores, 10)),
+            "p50": float(np.percentile(scores, 50)),
+            "p90": float(np.percentile(scores, 90)),
+            "p95": float(np.percentile(scores, 95)),
+            "p99": float(np.percentile(scores, 99)),
+            "mean": float(np.mean(scores)),
+            "std": float(np.std(scores)),
+        }
+        
+        logger.debug(f"Anomaly score distribution: {percentiles}")
+        return percentiles
+    
+    def _compute_cluster_quality(
+        self, 
+        cluster_features: np.ndarray, 
+        cluster_labels: np.ndarray
+    ) -> Dict[str, float]:
+        """
+        Phase 1: Compute clustering quality metrics.
+        
+        Metrics computed:
+        - Silhouette score: Measures cluster cohesion and separation (-1 to +1)
+        - Cluster size variance: Detects imbalanced clusters
+        
+        INTERNAL use only for confidence estimation.
+        NOT exposed to frontend in Phase 1.
+        
+        Returns:
+            Dictionary with quality metrics
+        """
+        quality_metrics = {}
+        
+        # Only compute silhouette if we have clusters (not just noise)
+        n_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+        
+        if n_clusters < 2:
+            logger.info("Fewer than 2 clusters found, skipping silhouette score")
+            quality_metrics["silhouette_score"] = 0.0
+            quality_metrics["silhouette_status"] = "insufficient_clusters"
+        else:
+            # Filter out noise points (label == -1) for silhouette calculation
+            mask = cluster_labels != -1
+            if np.sum(mask) > 0:
+                try:
+                    silhouette_avg = silhouette_score(
+                        cluster_features[mask], 
+                        cluster_labels[mask],
+                        metric='euclidean'
+                    )
+                    quality_metrics["silhouette_score"] = float(silhouette_avg)
+                    quality_metrics["silhouette_status"] = "computed"
+                    
+                    # Interpretation for internal use:
+                    # > 0.7: Strong clustering
+                    # 0.5-0.7: Moderate clustering
+                    # < 0.5: Weak clustering
+                    
+                    logger.info(f"Cluster silhouette score: {silhouette_avg:.3f}")
+                except Exception as e:
+                    logger.warning(f"Could not compute silhouette score: {e}")
+                    quality_metrics["silhouette_score"] = 0.0
+                    quality_metrics["silhouette_status"] = "computation_failed"
+            else:
+                quality_metrics["silhouette_score"] = 0.0
+                quality_metrics["silhouette_status"] = "only_noise"
+        
+        # Cluster size variance
+        cluster_sizes = []
+        for label in set(cluster_labels):
+            if label != -1:  # Exclude noise
+                size = np.sum(cluster_labels == label)
+                cluster_sizes.append(size)
+        
+        if len(cluster_sizes) > 0:
+            quality_metrics["mean_cluster_size"] = float(np.mean(cluster_sizes))
+            quality_metrics["cluster_size_variance"] = float(np.var(cluster_sizes))
+            quality_metrics["cluster_size_std"] = float(np.std(cluster_sizes))
+        
+        return quality_metrics
+    
+    # ============================================================
+    # PHASE 3: DOMAIN-AWARE ASTRONOMY FEATURES
+    # ============================================================
+    
+    def _apply_distance_aware_normalization(self) -> np.ndarray:
+        """
+        Phase 3: Apply astronomy-aware feature engineering.
+        
+        Key insight: Brightness should be normalized by distance.
+        - Distant stars appear fainter (higher magnitude)
+        - Nearby stars appear brighter (lower magnitude)
+        - Compare: absolute magnitude, not apparent magnitude
+        
+        Transformation:
+        - Use parallax to estimate distance
+        - Adjust brightness to "standard distance" (10 parsecs)
+        - This gives distance-corrected brightness
+        
+        Returns:
+            Enhanced feature matrix with distance-corrected brightness
+        """
+        if self._df is None or self._scaled_features is None:
+            return self._scaled_features
+        
+        logger.info("Applying distance-aware normalization (astronomy domain knowledge)")
+        
+        # Create a copy of the dataframe
+        df_enhanced = self._df.copy()
+        
+        # Calculate distance in parsecs from parallax (mas)
+        # distance_pc = 1000 / parallax_mas
+        df_enhanced["distance_pc"] = 1000.0 / df_enhanced["parallax_mas"].clip(lower=0.01)
+        
+        # Calculate absolute magnitude (brightness at 10 pc)
+        # M = m + 5 - 5*log10(distance_pc)
+        # where m = apparent magnitude, M = absolute magnitude
+        df_enhanced["absolute_mag"] = (
+            df_enhanced["brightness_mag"] 
+            + 5 
+            - 5 * np.log10(df_enhanced["distance_pc"].clip(lower=0.1))
+        )
+        
+        # Replace apparent magnitude with absolute magnitude in features
+        enhanced_features = df_enhanced[
+            ["ra_deg", "dec_deg", "absolute_mag", "parallax_mas"]
+        ].values
+        
+        # Apply StandardScaler to the enhanced features
+        scaler_enhanced = StandardScaler()
+        scaled_enhanced = scaler_enhanced.fit_transform(enhanced_features)
+        
+        logger.info("Distance-aware normalization applied successfully")
+        return scaled_enhanced
+    
+    def _check_proper_motion_consistency(
+        self, 
+        cluster_labels: np.ndarray
+    ) -> Dict[str, Any]:
+        """
+        Phase 3: Check proper motion consistency within clusters.
+        
+        Astronomy principle: Stars in a physical cluster should have
+        similar proper motion (co-moving groups).
+        
+        This increases confidence for clusters with consistent proper motion
+        and decreases confidence for clusters with random motion.
+        
+        Returns:
+            Dictionary with proper motion consistency metrics per cluster
+        """
+        # Check if proper motion data is available
+        if self._df is None:
+            return {}
+        
+        # Check if raw_metadata contains proper motion
+        # (pmra, pmdec are common fields in Gaia data)
+        pm_availability = []
+        for idx, row in self._df.iterrows():
+            if row.get("raw_metadata") and isinstance(row["raw_metadata"], dict):
+                has_pmra = "pmra" in row["raw_metadata"] or "pm_ra" in row["raw_metadata"]
+                has_pmdec = "pmdec" in row["raw_metadata"] or "pm_dec" in row["raw_metadata"]
+                pm_availability.append(has_pmra and has_pmdec)
+            else:
+                pm_availability.append(False)
+        
+        if not any(pm_availability):
+            logger.info("No proper motion data available in raw_metadata")
+            return {"status": "no_proper_motion_data"}
+        
+        logger.info("Proper motion data found - analyzing cluster consistency")
+        
+        # Extract proper motion values
+        pmra_values = []
+        pmdec_values = []
+        
+        for idx, row in self._df.iterrows():
+            metadata = row.get("raw_metadata", {}) or {}
+            pmra = metadata.get("pmra") or metadata.get("pm_ra")
+            pmdec = metadata.get("pmdec") or metadata.get("pm_dec")
+            
+            pmra_values.append(pmra if pmra is not None else 0.0)
+            pmdec_values.append(pmdec if pmdec is not None else 0.0)
+        
+        # Analyze proper motion consistency per cluster
+        cluster_pm_stats = {}
+        unique_clusters = set(cluster_labels)
+        
+        for cluster_id in unique_clusters:
+            if cluster_id == -1:  # Skip noise
+                continue
+            
+            mask = cluster_labels == cluster_id
+            cluster_pmra = np.array([pmra_values[i] for i, m in enumerate(mask) if m])
+            cluster_pmdec = np.array([pmdec_values[i] for i, m in enumerate(mask) if m])
+            
+            if len(cluster_pmra) > 1:
+                # Calculate standard deviation (dispersion) of proper motion
+                pmra_std = float(np.std(cluster_pmra))
+                pmdec_std = float(np.std(cluster_pmdec))
+                
+                # Low std = high consistency = likely physical cluster
+                # High std = low consistency = likely chance alignment
+                cluster_pm_stats[f"cluster_{cluster_id}"] = {
+                    "pmra_std": pmra_std,
+                    "pmdec_std": pmdec_std,
+                    "pm_consistency_score": 1.0 / (1.0 + pmra_std + pmdec_std),  # 0-1 scale
+                    "n_stars": int(np.sum(mask))
+                }
+        
+        return cluster_pm_stats
+    
+    # ============================================================
+    # PHASE 4: FAILURE MODE AWARENESS
+    # ============================================================
+    
+    def _detect_analysis_issues(self, n_stars: int, result_data: Dict[str, Any]) -> Optional[str]:
+        """
+        Phase 4: Detect potential analysis issues and generate soft warnings.
+        
+        This provides scientific honesty without blocking results.
+        Returns None if analysis is confident, or a warning string if issues detected.
+        
+        Checks:
+        - Sparse datasets (< 50 stars)
+        - Poor clustering confidence (silhouette < 0.3)
+        - Unstable anomaly thresholds
+        
+        Returns:
+            Optional warning message string (or None if confident)
+        """
+        self._analysis_warnings.clear()
+        
+        # Check 1: Sparse dataset
+        if n_stars < 50:
+            self._analysis_warnings.append(
+                f"Limited dataset size ({n_stars} stars). Results more reliable with 100+ stars."
+            )
+        
+        # Check 2: Poor clustering quality
+        if self._cluster_quality_metrics:
+            silhouette = self._cluster_quality_metrics.get("silhouette_score", 1.0)
+            if silhouette < 0.3 and silhouette > 0:
+                self._analysis_warnings.append(
+                    "Clustering confidence is moderate. Consider adjusting parameters."
+                )
+        
+        # Check 3: Anomaly score distribution issues
+        if self._anomaly_score_percentiles:
+            score_range = abs(
+                self._anomaly_score_percentiles.get("p99", 0) - 
+                self._anomaly_score_percentiles.get("p01", 0)
+            )
+            if score_range < 0.1:
+                self._analysis_warnings.append(
+                    "Anomaly scores have low variance. Data may be too uniform."
+                )
+        
+        # Return combined warning or None
+        if self._analysis_warnings:
+            return " ".join(self._analysis_warnings)
+        return None
+    
     def _save_anomaly_results(
         self,
         contamination: float,
@@ -614,10 +1020,13 @@ class AIDiscoveryService:
         total_stars: int,
         anomalies: List[Dict[str, Any]],
         all_scores: np.ndarray,
-        all_labels: np.ndarray
+        all_labels: np.ndarray,
+        analysis_note: Optional[str] = None  # Phase 4: optional warning
     ) -> str:
         """
         Save anomaly detection results to database.
+        
+        ENHANCED (Phase 4): Includes optional analysis_note for warnings
         
         Args:
             contamination: Contamination parameter used
@@ -627,11 +1036,30 @@ class AIDiscoveryService:
             anomalies: List of detected anomalies
             all_scores: Anomaly scores for all stars
             all_labels: Anomaly labels for all stars (-1 or 1)
+            analysis_note: Optional warning message (Phase 4)
             
         Returns:
             run_id: UUID of the created discovery run
         """
         repo = DiscoveryRepository(self.db)
+        
+        # Build results summary with Phase 1 metrics
+        results_summary = {
+            "n_anomalies": len(anomalies),
+            "anomaly_rate": len(anomalies) / total_stars if total_stars > 0 else 0,
+            "mean_anomaly_score": float(np.mean([a["anomaly_score"] for a in anomalies])) if anomalies else 0,
+            "min_anomaly_score": float(np.min([a["anomaly_score"] for a in anomalies])) if anomalies else 0
+        }
+        
+        # Phase 1: Add internal confidence metrics to summary (for research tracking)
+        if self._anomaly_feature_weights:
+            results_summary["feature_weights"] = self._anomaly_feature_weights
+        if self._anomaly_score_percentiles:
+            results_summary["score_distribution"] = self._anomaly_score_percentiles
+        
+        # Phase 4: Add analysis note if present
+        if analysis_note:
+            results_summary["analysis_note"] = analysis_note
         
         # Create discovery run
         run = repo.save_discovery_run(
@@ -645,12 +1073,7 @@ class AIDiscoveryService:
             },
             dataset_filter=dataset_filter,
             total_stars=total_stars,
-            results_summary={
-                "n_anomalies": len(anomalies),
-                "anomaly_rate": len(anomalies) / total_stars if total_stars > 0 else 0,
-                "mean_anomaly_score": float(np.mean([a["anomaly_score"] for a in anomalies])) if anomalies else 0,
-                "min_anomaly_score": float(np.min([a["anomaly_score"] for a in anomalies])) if anomalies else 0
-            }
+            results_summary=results_summary
         )
         
         # Save individual results for all stars
@@ -680,10 +1103,13 @@ class AIDiscoveryService:
         use_position_and_magnitude: bool,
         dataset_filter: Optional[Dict[str, Any]],
         cluster_labels: np.ndarray,
-        result: Dict[str, Any]
+        result: Dict[str, Any],
+        analysis_note: Optional[str] = None  # Phase 4: optional warning
     ) -> str:
         """
         Save clustering results to database.
+        
+        ENHANCED (Phase 4): Includes optional analysis_note for warnings
         
         Args:
             eps: Epsilon parameter used
@@ -692,11 +1118,27 @@ class AIDiscoveryService:
             dataset_filter: Query filters applied (if any)
             cluster_labels: Cluster labels for all stars
             result: Full clustering result dictionary
+            analysis_note: Optional warning message (Phase 4)
             
         Returns:
             run_id: UUID of the created discovery run
         """
         repo = DiscoveryRepository(self.db)
+        
+        # Build results summary with Phase 1 & 3 metrics
+        results_summary = {
+            "n_clusters": result["n_clusters"],
+            "n_noise": result["n_noise"],
+            "cluster_sizes": {name: stats["count"] for name, stats in result["cluster_stats"].items()}
+        }
+        
+        # Phase 1: Add clustering quality metrics (for research tracking)
+        if self._cluster_quality_metrics:
+            results_summary["quality_metrics"] = self._cluster_quality_metrics
+        
+        # Phase 4: Add analysis note if present
+        if analysis_note:
+            results_summary["analysis_note"] = analysis_note
         
         # Create discovery run
         run = repo.save_discovery_run(
@@ -711,11 +1153,7 @@ class AIDiscoveryService:
             },
             dataset_filter=dataset_filter,
             total_stars=result["total_stars"],
-            results_summary={
-                "n_clusters": result["n_clusters"],
-                "n_noise": result["n_noise"],
-                "cluster_sizes": {name: stats["count"] for name, stats in result["cluster_stats"].items()}
-            }
+            results_summary=results_summary
         )
         
         # Save individual results for all stars

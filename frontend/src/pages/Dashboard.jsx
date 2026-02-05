@@ -25,7 +25,9 @@ import {
     AlertCircle,
     Target,
     Clock,
-    Eye
+    Eye,
+    BookOpen,
+    Sparkles
 } from 'lucide-react';
 import {
     searchStars,
@@ -59,6 +61,8 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
         { id: 'harmonize', icon: Link2, label: 'Harmonizer' },
         { id: 'export', icon: Download, label: 'Export' },
         { id: 'planet-hunter', icon: Target, label: 'Planet Hunter', external: true },
+        { id: 'ai-assistant', icon: Sparkles, label: 'AI Assistant', link: '/ai-assistant' },
+        { id: 'research-methodology', icon: BookOpen, label: 'Research Methods', link: '/research-methodology' },
     ];
 
     return (

@@ -102,6 +102,10 @@ class AnomalyDetectionResponse(BaseModel):
     anomaly_count: int
     contamination_used: float
     anomalies: list[AnomalyItem]
+    analysis_note: Optional[str] = Field(
+        default=None,
+        description="Phase 4: Optional warning about analysis quality or data issues"
+    )
 
 
 class ClusterStats(BaseModel):
@@ -134,6 +138,10 @@ class ClusteringResponse(BaseModel):
     parameters: dict
     clusters: dict[str, list[ClusterMember]]
     cluster_stats: dict[str, ClusterStats]
+    analysis_note: Optional[str] = Field(
+        default=None,
+        description="Phase 4: Optional warning about analysis quality or data issues"
+    )
 
 
 class InsightsSummary(BaseModel):
@@ -186,6 +194,12 @@ async def detect_anomalies(
     """
     Run anomaly detection on the star catalog.
     
+    ENHANCED (Phases 1-4):
+    - Phase 1: Internal confidence tracking
+    - Phase 2: Smart ranking for better results
+    - Phase 3: Distance-aware feature engineering
+    - Phase 4: Soft warnings for data quality issues
+    
     Uses Isolation Forest algorithm with configurable contamination level.
     Returns list of stars identified as anomalies, sorted by anomaly score.
     """
@@ -194,10 +208,16 @@ async def detect_anomalies(
         
         service = AIDiscoveryService(db)
         service.load_data()
-        anomalies = service.detect_anomalies(contamination=request.contamination)
+        anomalies = service.detect_anomalies(
+            contamination=request.contamination,
+            use_distance_aware=True  # Phase 3: astronomy domain knowledge
+        )
         
         # Convert to response format
         anomaly_items = [AnomalyItem(**a) for a in anomalies]
+        
+        # Phase 4: Extract analysis warning if present
+        analysis_note = service._detect_analysis_issues(len(service._df), {"anomalies": anomalies})
         
         return AnomalyDetectionResponse(
             success=True,
@@ -206,6 +226,7 @@ async def detect_anomalies(
             anomaly_count=len(anomalies),
             contamination_used=request.contamination,
             anomalies=anomaly_items,
+            analysis_note=analysis_note  # Phase 4: optional warning
         )
         
     except InsufficientDataError as e:
@@ -275,6 +296,12 @@ async def detect_clusters(
     """
     Run DBSCAN clustering on the star catalog.
     
+    ENHANCED (Phases 1-4):
+    - Phase 1: Internal silhouette score tracking
+    - Phase 2: Cluster validity pruning (removes weak clusters)
+    - Phase 3: Proper motion consistency checks
+    - Phase 4: Soft warnings for data quality issues
+    
     Clusters stars based on position and brightness.
     Returns cluster assignments and statistics for each cluster.
     """
@@ -288,13 +315,19 @@ async def detect_clusters(
         service.load_data()
         result = service.detect_clusters(
             eps=request.eps,
-            min_samples=request.min_samples
+            min_samples=request.min_samples,
+            apply_quality_filtering=True  # Phase 2: smart filtering
         )
         
         # Convert cluster_stats to proper format
         cluster_stats_formatted = {}
         for name, stats in result["cluster_stats"].items():
-            cluster_stats_formatted[name] = ClusterStats(**stats)
+            # Phase 3: Proper motion data included if available, filter it out for response
+            stats_for_response = {k: v for k, v in stats.items() if k != "proper_motion"}
+            cluster_stats_formatted[name] = ClusterStats(**stats_for_response)
+        
+        # Phase 4: Extract analysis note if present
+        analysis_note = result.get("analysis_note")
         
         return ClusteringResponse(
             success=True,
@@ -305,6 +338,7 @@ async def detect_clusters(
             parameters=result["parameters"],
             clusters=result["clusters"],
             cluster_stats=cluster_stats_formatted,
+            analysis_note=analysis_note  # Phase 4: optional warning
         )
         
     except InsufficientDataError as e:

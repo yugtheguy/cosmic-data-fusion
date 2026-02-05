@@ -1,0 +1,694 @@
+/* AI Research Assistant - Dashboard-Aligned Styles */
+
+/* Main Container - Match Dashboard Layout */
+.ai-research-assistant {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  animation: fadeIn 0.4s ease;
+}
+
+/* Header - Match AILab Pattern */
+.assistant-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.header-title h2 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.sparkle-icon {
+  color: var(--accent-primary);
+}
+
+.assistant-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* AI Toggle - Match Dashboard Controls */
+.ai-toggle-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-surface);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 60px;
+  height: 32px;
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  top: 4px;
+  left: 4px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.ai-toggle input[type="checkbox"]:checked + .toggle-slider {
+  background: var(--accent-primary);
+}
+
+.ai-toggle input[type="checkbox"]:checked + .toggle-slider::before {
+  left: 32px;
+}
+
+.toggle-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Info Banner - Match Dashboard Pattern */
+.ai-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(212, 104, 58, 0.1);
+  border: 1px solid rgba(212, 104, 58, 0.3);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* Analysis Scope - Match Analysis Note Banner */
+.analysis-scope-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #3b82f6;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Query Form - Match Dashboard Controls */
+.query-form {
+  margin-bottom: 1.5rem;
+}
+
+.query-input-container {
+  display: flex;
+  gap: 1rem;
+}
+
+.query-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.query-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: var(--bg-surface);
+}
+
+.query-input::placeholder {
+  color: var(--text-muted);
+}
+
+.query-button {
+  padding: 0.75rem 2rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.query-button:hover:not(:disabled) {
+  background: var(--accent-secondary);
+}
+
+.query-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Example Queries - Match Dashboard Pattern */
+.example-queries {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-surface);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.examples-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.examples-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.example-chip {
+  padding: 0.5rem 1rem;
+  background: rgba(212, 104, 58, 0.1);
+  border: 1px solid rgba(212, 104, 58, 0.3);
+  border-radius: 6px;
+  color: var(--accent-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.example-chip:hover:not(:disabled) {
+  background: rgba(212, 104, 58, 0.15);
+  border-color: var(--accent-primary);
+}
+
+.example-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading and Error - Match Dashboard */
+.loading-state {
+  text-align: center;
+  padding: 3rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 1rem;
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  margin-bottom: 1.5rem;
+  animation: slideDown 0.3s ease;
+}
+
+/* Results Container */
+.results-container {
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Interpretation Card - Match AILab Panel */
+.interpretation-card {
+  padding: 1.5rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.interpretation-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.interpretation-text {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+  line-height: 1.6;
+}
+
+.interpretation-meta {
+  display: flex;
+  gap: 2rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.meta-item strong {
+  color: var(--text-primary);
+}
+
+/* AI Analysis Section - Match AILab Panel */
+.ai-analysis-section {
+  padding: 1.5rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.ai-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ai-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Research Summary */
+.research-summary {
+  padding: 1rem;
+  background: rgba(212, 104, 58, 0.05);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(212, 104, 58, 0.2);
+}
+
+.research-summary h4 {
+  margin: 0 0 0.75rem 0;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.research-summary > p {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin: 0 0 0.75rem 0;
+}
+
+.analysis-stats {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.reasoning-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(212, 104, 58, 0.1);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* Key Findings */
+.key-findings {
+  margin-top: 1.5rem;
+}
+
+.key-findings h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.findings-list {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Finding Card - Match Dashboard Card Pattern */
+.finding-card {
+  padding: 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.finding-card:hover {
+  background: rgba(212, 104, 58, 0.05);
+  border-color: rgba(212, 104, 58, 0.3);
+}
+
+.finding-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.finding-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--accent-primary);
+  color: white;
+  font-weight: 600;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.finding-header h5 {
+  flex: 1;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Deviation Badge - Match Dashboard Badges */
+.deviation-badge {
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.deviation-strong {
+  background: rgba(74, 159, 110, 0.2);
+  color: var(--success);
+  border: 1px solid rgba(74, 159, 110, 0.4);
+}
+
+.deviation-moderate {
+  background: rgba(212, 104, 58, 0.2);
+  color: var(--accent-secondary);
+  border: 1px solid rgba(212, 104, 58, 0.4);
+}
+
+.deviation-weak {
+  background: rgba(136, 136, 136, 0.2);
+  color: var(--text-secondary);
+  border: 1px solid rgba(136, 136, 136, 0.4);
+}
+
+.deviation-unknown {
+  background: rgba(136, 136, 136, 0.1);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+}
+
+.finding-significance {
+  margin: 0 0 0.75rem 0;
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: 0.9rem;
+}
+
+.finding-significance strong {
+  color: var(--accent-secondary);
+}
+
+.finding-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.significance-bar {
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.significance-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* Fallback Notice */
+.fallback-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 8px;
+  color: #f59e0b;
+  margin-bottom: 1.5rem;
+  animation: slideDown 0.3s ease;
+}
+
+.fallback-notice strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.fallback-notice p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* Standard Results - Match Dashboard Table */
+.standard-results {
+  padding: 1.5rem;
+  background: var(--bg-surface);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 1.5rem;
+}
+
+.standard-results h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.results-count {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.results-table-container {
+  overflow-x: auto;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.results-table th {
+  text-align: left;
+  padding: 0.75rem;
+  background: rgba(212, 104, 58, 0.1);
+  color: var(--accent-secondary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.results-table td {
+  padding: 0.75rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.results-table tbody tr:hover {
+  background: rgba(212, 104, 58, 0.05);
+}
+
+.more-results {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* Suggestions - Match Dashboard Pattern */
+.suggestions-section {
+  padding: 1.5rem;
+  background: var(--bg-surface);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.suggestions-section h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.suggestion-button {
+  padding: 0.5rem 1rem;
+  background: rgba(212, 104, 58, 0.1);
+  border: 1px solid rgba(212, 104, 58, 0.3);
+  border-radius: 6px;
+  color: var(--accent-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.suggestion-button:hover {
+  background: rgba(212, 104, 58, 0.15);
+  border-color: var(--accent-primary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .ai-research-assistant {
+    padding: 1rem;
+  }
+
+  .query-input-container {
+    flex-direction: column;
+  }
+
+  .interpretation-meta,
+  .analysis-stats {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+  .finding-header {
+    flex-wrap: wrap;
+  }
+
+  .finding-details {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .interpretation-meta {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
