@@ -286,8 +286,15 @@ class FITSAdapter(BaseAdapter):
                     record[col_name] = value.item()
                 elif isinstance(value, np.ndarray):
                     record[col_name] = value.tolist()
+                elif isinstance(value, (np.str_, np.bytes_)):
+                    # Convert numpy string types to Python str
+                    record[col_name] = str(value)
                 else:
-                    record[col_name] = value
+                    # For any other type, try to convert to Python native
+                    try:
+                        record[col_name] = value.item() if hasattr(value, 'item') else value
+                    except:
+                        record[col_name] = value
             
             records.append(record)
         

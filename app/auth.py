@@ -215,3 +215,47 @@ async def get_current_superuser(current_user: User = Depends(get_current_user)) 
             detail="Not enough permissions. Superuser access required."
         )
     return current_user
+
+
+async def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    Optional authentication dependency - returns User if token is valid, None otherwise.
+    
+    Use this for endpoints that work both authenticated and unauthenticated.
+    
+    Example:
+        @router.get("/public-data")
+        def public_endpoint(current_user: Optional[User] = Depends(get_current_user_optional)):
+            if current_user:
+                # Return user-specific data
+                return get_user_data(current_user.id)
+            else:
+                # Return public data
+                return get_public_data()
+    
+    Args:
+        token: JWT token from Authorization header (optional)
+        db: Database session
+        
+    Returns:
+        User object if authenticated, None if no valid token
+    """
+    if not token:
+        return None
+    
+    try:
+        email = decode_access_token(token)
+        if email is None:
+            return None
+        
+        user = db.query(User).filter(User.email == email).first()
+        if user is None:
+            return None
+        
+        return user
+    except Exception:
+        # Token is invalid or expired, return None instead of raising
+        return None

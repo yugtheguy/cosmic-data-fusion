@@ -14,8 +14,11 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from typing import Optional
 
 from app.database import get_db
+from app.auth import get_current_user, get_current_user_optional
+from app.models import User
 from app.schemas import (
     GaiaLoadResponse,
     DatasetStatsResponse,
@@ -26,6 +29,7 @@ from app.schemas import (
 )
 from app.services.gaia_ingestion import GaiaIngestionService
 from app.services.csv_ingestion import CSVIngestionError
+from app.config import ENABLE_GAIA_SAMPLE_LOADER, ENABLE_SDSS_SAMPLE_LOADER
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +73,16 @@ def load_gaia_dataset(
         GaiaLoadResponse with ingestion statistics
         
     Raises:
+        HTTPException 403: If bundled data loading is disabled
         HTTPException 500: If ingestion fails
     """
+    # Check if bundled data loading is enabled
+    if not ENABLE_GAIA_SAMPLE_LOADER:
+        raise HTTPException(
+            status_code=403,
+            detail="Gaia sample data loading is disabled. Set COSMIC_ENABLE_GAIA_SAMPLE_LOADER=true to enable."
+        )
+    
     try:
         logger.info(
             f"Gaia load request: skip_duplicates={skip_duplicates}, "
@@ -160,8 +172,16 @@ def load_sdss_dataset(
         GaiaLoadResponse with ingestion statistics
         
     Raises:
+        HTTPException 403: If bundled data loading is disabled
         HTTPException 500: If ingestion fails
     """
+    # Check if bundled data loading is enabled
+    if not ENABLE_SDSS_SAMPLE_LOADER:
+        raise HTTPException(
+            status_code=403,
+            detail="SDSS sample data loading is disabled. Set COSMIC_ENABLE_SDSS_SAMPLE_LOADER=true to enable."
+        )
+    
     from app.services.sdss_ingestion import SDSSIngestionService
     
     try:
@@ -321,19 +341,31 @@ List all registered datasets with pagination.
 - `limit`: Number of results per page (default: 100, max: 1000)
 - `offset`: Pagination offset (default: 0)
 
-Returns datasets sorted by ingestion time (newest first).
+**Authentication**: Optional. If authenticated, returns only user's datasets.
+If not authenticated, returns empty list (use frontend to upload data).
     """
 )
 def list_datasets(
     catalog_type: str = None,
     limit: int = 100,
     offset: int = 0,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """List all datasets with optional filtering and pagination."""
+    import json
     from app.repository.dataset_repository import DatasetRepository
     
     try:
+        # If no user is authenticated, return empty list
+        if not current_user:
+            return DatasetListResponse(
+                datasets=[],
+                total=0,
+                limit=limit,
+                offset=offset
+            )
+        
         # Validate pagination params
         if limit < 1 or limit > 1000:
             raise HTTPException(status_code=400, detail="Limit must be between 1 and 1000")
@@ -342,8 +374,16 @@ def list_datasets(
         
         repo = DatasetRepository(db)
         
-        datasets = repo.list_all(catalog_type=catalog_type, limit=limit, offset=offset)
-        total = repo.count_all(catalog_type=catalog_type)
+        # Filter by current user
+        datasets = repo.list_by_user(user_id=current_user.id, catalog_type=catalog_type, limit=limit, offset=offset)
+        total = repo.count_by_user(user_id=current_user.id, catalog_type=catalog_type)
+        
+        # Parse JSON strings from SQLite
+        for dataset in datasets:
+            if isinstance(dataset.column_mappings, str):
+                dataset.column_mappings = json.loads(dataset.column_mappings)
+            if isinstance(dataset.raw_config, str):
+                dataset.raw_config = json.loads(dataset.raw_config)
         
         return DatasetListResponse(
             datasets=datasets,
@@ -446,19 +486,20 @@ def get_dataset(
     status_code=204,
     summary="Delete dataset",
     description="""
-Delete a dataset metadata record.
+Delete a dataset and all associated star records.
 
-**WARNING**: This only deletes the metadata entry, NOT the associated
-star records. Star records will remain in the database with their
-dataset_id field set to the deleted ID.
+**Authentication Required**: Users can only delete their own datasets.
 
-Consider implementing soft delete or cascade deletion based on your needs.
+This endpoint:
+1. Deletes all star records associated with this dataset
+2. Deletes the dataset metadata record
 
-Returns 404 if dataset not found.
+Returns 404 if dataset not found or doesn't belong to user.
     """
 )
 def delete_dataset(
     dataset_id: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a dataset and all associated stars."""
@@ -466,13 +507,28 @@ def delete_dataset(
     from app.repository.star_catalog import StarCatalogRepository
     
     try:
-        # 1. Delete associated star records
+        # 1. Verify ownership
+        repo = DatasetRepository(db)
+        dataset = repo.get_by_id(dataset_id)
+        
+        if not dataset:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Dataset '{dataset_id}' not found"
+            )
+        
+        if dataset.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to delete this dataset"
+            )
+        
+        # 2. Delete associated star records
         star_repo = StarCatalogRepository(db)
         deleted_stars = star_repo.delete_by_dataset_id(dataset_id)
         logger.info(f"Deleted {deleted_stars} stars for dataset {dataset_id}")
         
-        # 2. Delete dataset metadata
-        repo = DatasetRepository(db)
+        # 3. Delete dataset metadata
         deleted = repo.delete(dataset_id)
         
         if not deleted and deleted_stars == 0:
@@ -492,3 +548,24 @@ def delete_dataset(
             status_code=500,
             detail=f"Failed to delete dataset: {str(e)}"
         )
+
+
+@router.get(
+    "/config/status",
+    summary="Get configuration status",
+    description="""
+Check which features are enabled/disabled in the current deployment.
+
+Returns:
+- Bundled data loading status
+- Sample dataset loaders (Gaia, SDSS)
+- Feature flags
+
+Useful for understanding what ingestion options are available.
+    """
+)
+def get_configuration_status():
+    """Get current configuration status."""
+    from app.config import get_config_summary
+    return get_config_summary()
+

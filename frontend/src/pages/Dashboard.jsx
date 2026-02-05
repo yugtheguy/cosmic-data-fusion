@@ -150,7 +150,7 @@ function FilterControls({ filters, setFilters, onResetFilters, isLoading, datase
                 <div className="filter-group">
                     <label>My Uploads</label>
                     <div className="dataset-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-                        {datasets.map(d => (
+                        {datasets?.map(d => (
                             <div key={d.id} className="dataset-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', flex: 1 }}>
                                     <input
@@ -159,7 +159,7 @@ function FilterControls({ filters, setFilters, onResetFilters, isLoading, datase
                                         onChange={() => toggleDataset(d.id)}
                                     />
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.name}>
-                                        {d.name.length > 15 ? d.name.substring(0, 15) + '...' : d.name}
+                                        {d.name?.length > 15 ? d.name.substring(0, 15) + '...' : d.name}
                                     </span>
                                 </label>
                                 <button
@@ -1263,16 +1263,9 @@ function Dashboard() {
                     starsResponse = { records: [], total_count: 0 };
                 }
 
-                // If no stars, try to load Gaia data automatically
+                // If no stars, just show empty message (bundled data is disabled)
                 if (!starsResponse.records?.length || starsResponse.total_count === 0) {
-                    console.log('No star data found, loading Gaia sample data...');
-                    try {
-                        await loadGaiaData();
-                        // Re-fetch stars after loading
-                        starsResponse = await searchStars({ limit: 5000 });
-                    } catch (loadErr) {
-                        console.error('Failed to load Gaia data:', loadErr);
-                    }
+                    console.log('No star data found. Upload your own datasets to get started!');
                 }
 
                 setStars(starsResponse.records || []);
