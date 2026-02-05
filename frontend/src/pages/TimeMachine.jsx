@@ -230,7 +230,8 @@ function TimeMachine() {
         const epochDiff = Math.abs(currentEpoch - previousEpoch);
 
         // Trigger time warp effect for jumps > 500 years
-        if (epochDiff > 500 && !isWarping) {
+        // BUT skip warp effect if timeline is playing (continuous animation)
+        if (epochDiff > 500 && !isWarping && !isPlaying) {
             const direction = currentEpoch > previousEpoch ? 'FUTURE' : 'PAST';
             const message = direction === 'FUTURE'
                 ? `WARPING ${epochDiff.toLocaleString()} YEARS INTO THE FUTURE`
@@ -248,12 +249,27 @@ function TimeMachine() {
             setPreviousEpoch(currentEpoch);
         }
 
-        const timer = setTimeout(() => {
-            fetchStarsAtEpoch(currentEpoch);
-        }, 300);
+        // CRITICAL FIX: Skip API calls entirely during animation to prevent flickering
+        // Only fetch data when timeline is NOT playing
+        if (!isPlaying) {
+            const timer = setTimeout(() => {
+                fetchStarsAtEpoch(currentEpoch);
+            }, 300);
 
-        return () => clearTimeout(timer);
-    }, [currentEpoch, fetchStarsAtEpoch]);
+            return () => clearTimeout(timer);
+        }
+    }, [currentEpoch, fetchStarsAtEpoch, isPlaying, isWarping, previousEpoch]);
+
+    // Fetch data when animation stops to show final epoch
+    useEffect(() => {
+        if (!isPlaying) {
+            // Small delay to let the final epoch settle
+            const timer = setTimeout(() => {
+                fetchStarsAtEpoch(currentEpoch);
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isPlaying, currentEpoch, fetchStarsAtEpoch]);
 
 
     // Handle filter apply
@@ -454,6 +470,12 @@ function TimeMachine() {
     const playAnimation = () => {
         if (animationFrames.length === 0) return;
 
+        // Prevent starting multiple animations
+        if (animationRef.current) {
+            console.warn('Animation already running');
+            return;
+        }
+
         setIsAnimating(true);
 
         const frameInterval = 1000 / (30 * animationSpeed); // 30 FPS base
@@ -504,6 +526,26 @@ function TimeMachine() {
             }
         };
     }, []);
+
+    // Restart animation when speed changes (if currently playing)
+    useEffect(() => {
+        if (isAnimating && animationRef.current) {
+            // Clear old interval
+            clearInterval(animationRef.current);
+
+            // Start new interval with updated speed
+            const frameInterval = 1000 / (30 * animationSpeed);
+            animationRef.current = setInterval(() => {
+                setCurrentFrameIndex(prev => {
+                    const nextIndex = prev + 1;
+                    if (nextIndex >= animationFrames.length) {
+                        return 0;
+                    }
+                    return nextIndex;
+                });
+            }, frameInterval);
+        }
+    }, [animationSpeed, isAnimating, animationFrames.length]);
 
     return (
         <>
@@ -866,7 +908,8 @@ function TimeMachine() {
                             ) : (
                                 <div style={{ position: 'relative' }}>
                                     {/* Confidence Heatmap Background */}
-                                    {showHeatmap && (
+                                    {/* CRITICAL FIX: Hide heatmap during animation to prevent canvas re-draw flickering */}
+                                    {showHeatmap && !isPlaying && (
                                         <div style={{
                                             position: 'absolute',
                                             top: 0,

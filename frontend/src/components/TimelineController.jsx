@@ -57,6 +57,9 @@ const TimelineController = ({
     // Animation loop for playback
     useEffect(() => {
         if (isPlaying) {
+            let frameCount = 0;
+            const EPOCH_UPDATE_INTERVAL = 10; // Only update epoch every 10 frames (~6 times per second)
+
             const animate = () => {
                 const now = Date.now();
                 const deltaTime = (now - lastUpdateRef.current) / 1000; // seconds
@@ -69,9 +72,16 @@ const TimelineController = ({
                 // Wrap around or stop at boundaries
                 if (newEpoch > maxEpoch) {
                     setLocalEpoch(minEpoch); // Loop back
+                    onEpochChange(minEpoch); // Always update on loop
                 } else {
                     setLocalEpoch(newEpoch);
-                    onEpochChange(newEpoch);
+
+                    // Throttle epoch change callbacks to reduce API calls
+                    frameCount++;
+                    if (frameCount >= EPOCH_UPDATE_INTERVAL) {
+                        onEpochChange(newEpoch);
+                        frameCount = 0;
+                    }
                 }
 
                 animationRef.current = requestAnimationFrame(animate);
@@ -82,6 +92,8 @@ const TimelineController = ({
             return () => {
                 if (animationRef.current) {
                     cancelAnimationFrame(animationRef.current);
+                    // Ensure final epoch is set when animation stops
+                    onEpochChange(localEpoch);
                 }
             };
         }
