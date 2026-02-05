@@ -26,7 +26,6 @@ function App() {
                         <Route path="/timemachine" element={<TimeMachine />} />
                         <Route path="/query" element={<QueryBuilder />} />
                         <Route path="/planet-hunter" element={<PlanetHunter />} />
-                        <Route path="/planet-hunter" element={<PlanetHunter />} />
                         <Route path="/star/:id" element={<StarDetailPage />} />
                         <Route path="/verify-email" element={<VerifyEmailPage />} />
                     </Routes>

@@ -1,83 +1,113 @@
-import { createContext, useState, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
+import { cacheManager } from '../utils/cacheManager';
 
-export const DataCacheContext = createContext();
+export const DataCacheContext = createContext(null);
+
+const CACHE_KEYS = {
+    STARS: 'stars',
+    DATASETS: 'datasets',
+    ANOMALIES: 'anomalies',
+    HARMONIZE_STATS: 'harmonize_stats'
+};
 
 export const DataCacheProvider = ({ children }) => {
-    const [cache, setCache] = useState({});
-    const [metadata, setMetadata] = useState({});
+    const [cache, setCache] = useState({
+        stars: null,
+        datasets: null,
+        anomalies: null,
+        harmonizeStats: null
+    });
 
-    // Cache keys constants
-    const CACHE_KEYS = {
-        DATASETS: 'datasets',
-        STARS: 'stars',
-        ANOMALIES: 'anomalies',
-        HARMONIZATION_STATS: 'harmonization_stats',
-        ANALYTICS: 'analytics',
-    };
+    const [cacheMetadata, setCacheMetadata] = useState({});
 
-    // Get cached data
-    const getCached = useCallback((key) => {
-        const cached = cache[key];
-        if (!cached) return null;
+    // Load cache from sessionStorage on mount
+    useEffect(() => {
+        const loadedCache = {};
+        const metadata = {};
 
-        const meta = metadata[key];
-        if (!meta) return null;
-
-        // Check if cache is expired (default 5 minutes)
-        const now = Date.now();
-        const maxAge = meta.maxAge || 5 * 60 * 1000; // 5 minutes
-        if (now - meta.timestamp > maxAge) {
-            return null;
-        }
-
-        return cached;
-    }, [cache, metadata]);
-
-    // Update cache
-    const updateCache = useCallback((key, data, maxAge = 5 * 60 * 1000) => {
-        setCache(prev => ({
-            ...prev,
-            [key]: data
-        }));
-        setMetadata(prev => ({
-            ...prev,
-            [key]: {
-                timestamp: Date.now(),
-                maxAge
+        Object.values(CACHE_KEYS).forEach(key => {
+            const cached = cacheManager.get(key);
+            if (cached) {
+                loadedCache[key] = cached.data;
             }
-        }));
-    }, []);
+            metadata[key] = cacheManager.getMetadata(key);
+        });
 
-    // Invalidate cache
-    const invalidateCache = useCallback((key) => {
-        if (key) {
-            setCache(prev => {
-                const newCache = { ...prev };
-                delete newCache[key];
-                return newCache;
-            });
-            setMetadata(prev => {
-                const newMeta = { ...prev };
-                delete newMeta[key];
-                return newMeta;
-            });
-        } else {
-            // Clear all cache
-            setCache({});
-            setMetadata({});
+        if (Object.keys(loadedCache).length > 0) {
+            setCache(prev => ({ ...prev, ...loadedCache }));
+            setCacheMetadata(metadata);
+            console.log('✅ Cache loaded:', metadata);
         }
     }, []);
 
-    // Get cache metadata
-    const cacheMetadata = useCallback((key) => {
-        return metadata[key] || null;
-    }, [metadata]);
+    /**
+     * Update cache for specific key
+     */
+    const updateCache = useCallback((key, data) => {
+        setCache(prev => ({ ...prev, [key]: data }));
+        cacheManager.set(key, data);
+        
+        // Update metadata
+        setCacheMetadata(prev => ({
+            ...prev,
+            [key]: cacheManager.getMetadata(key)
+        }));
+    }, []);
+
+    /**
+     * Get cached data with freshness check
+     */
+    const getCached = useCallback((key) => {
+        const cached = cacheManager.get(key);
+        return cached ? { data: cached.data, fresh: cached.fresh } : null;
+    }, []);
+
+    /**
+     * Invalidate specific cache entry
+     */
+    const invalidateCache = useCallback((key) => {
+        setCache(prev => ({ ...prev, [key]: null }));
+        cacheManager.remove(key);
+        setCacheMetadata(prev => ({
+            ...prev,
+            [key]: { exists: false }
+        }));
+    }, []);
+
+    /**
+     * Clear all cache
+     */
+    const clearAllCache = useCallback(() => {
+        setCache({
+            stars: null,
+            datasets: null,
+            anomalies: null,
+            harmonizeStats: null
+        });
+        cacheManager.clear();
+        setCacheMetadata({});
+        console.log('🗑️ All cache cleared');
+    }, []);
+
+    /**
+     * Refresh metadata
+     */
+    const refreshMetadata = useCallback(() => {
+        const metadata = {};
+        Object.values(CACHE_KEYS).forEach(key => {
+            metadata[key] = cacheManager.getMetadata(key);
+        });
+        setCacheMetadata(metadata);
+    }, []);
 
     const value = {
-        getCached,
-        updateCache,
-        invalidateCache,
+        cache,
         cacheMetadata,
+        updateCache,
+        getCached,
+        invalidateCache,
+        clearAllCache,
+        refreshMetadata,
         CACHE_KEYS
     };
 

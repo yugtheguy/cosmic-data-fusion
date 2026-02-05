@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import get_db
+from app.auth import get_current_user
+from app.models import User
 from app.schemas import (
     StarIngestRequest,
     BulkIngestRequest,
@@ -803,7 +805,8 @@ async def preview_ingestion(
     try:
         # Select adapter
         if adapter_type == "auto":
-            adapter_class = registry.detect_adapter(tmp_path, file.filename)
+            adapter_name, confidence, method = registry.detect_adapter(tmp_path)
+            adapter_class = registry.get_adapter(adapter_name)
         else:
             adapter_class = registry.get_adapter(adapter_type)
             
@@ -818,7 +821,9 @@ async def preview_ingestion(
         return IngestPreviewResponse(**preview_result)
         
     except Exception as e:
+        import traceback
         logger.error(f"Preview failed: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(400, f"Preview failed: {str(e)}")
         
     finally:
@@ -861,6 +866,7 @@ def ingest_csv_file(
     dataset_id: str = None,
     column_mapping: str = None,
     skip_invalid: bool = True,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -935,6 +941,8 @@ def ingest_csv_file(
         # Insert records into database
         db_records = []
         for record in valid_records:
+            # Set user_id for multi-tenancy
+            record['user_id'] = current_user.id
             db_record = UnifiedStarCatalog(**record)
             db_records.append(db_record)
         
@@ -943,6 +951,31 @@ def ingest_csv_file(
         db.commit()
         
         logger.info(f"Successfully ingested {len(db_records)} CSV records")
+        
+        # Register dataset in metadata table
+        from app.repository.dataset_repository import DatasetRepository
+        dataset_repo = DatasetRepository(db)
+        
+        # Check if dataset already exists
+        existing_dataset = dataset_repo.get_by_id(adapter.dataset_id)
+        if not existing_dataset:
+            # Create new dataset metadata
+            dataset_metadata = {
+                'dataset_id': adapter.dataset_id,
+                'source_name': file.filename,
+                'catalog_type': 'csv',
+                'adapter_used': 'CSVAdapter',
+                'record_count': len(db_records),
+                'original_filename': file.filename,
+                'column_mappings': mapping_dict or {},
+                'user_id': current_user.id
+            }
+            dataset_repo.create(dataset_metadata)
+            logger.info(f"Created dataset metadata for {adapter.dataset_id}")
+        else:
+            # Update record count if dataset exists
+            dataset_repo.update_record_count(adapter.dataset_id, existing_dataset.record_count + len(db_records))
+            logger.info(f"Updated dataset {adapter.dataset_id} with {len(db_records)} new records")
         
         # Collect validation warnings (limit to avoid huge response)
         warnings = []

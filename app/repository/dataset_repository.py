@@ -113,6 +113,61 @@ class DatasetRepository:
         
         return query.all()
     
+    def list_by_user(
+        self,
+        user_id: int,
+        catalog_type: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[DatasetMetadata]:
+        """
+        List datasets for a specific user with optional filtering.
+        
+        Args:
+            user_id: User ID to filter by
+            catalog_type: Filter by catalog type (gaia, sdss, fits, csv)
+            limit: Maximum number of results
+            offset: Number of results to skip (for pagination)
+            
+        Returns:
+            List of DatasetMetadata instances owned by the user
+        """
+        query = self.db.query(DatasetMetadata).filter(
+            DatasetMetadata.user_id == user_id
+        )
+        
+        # Apply catalog type filter if specified
+        if catalog_type:
+            query = query.filter(DatasetMetadata.catalog_type == catalog_type)
+        
+        # Order by ingestion time (newest first)
+        query = query.order_by(desc(DatasetMetadata.ingestion_time))
+        
+        # Apply pagination
+        query = query.offset(offset).limit(limit)
+        
+        return query.all()
+    
+    def count_by_user(self, user_id: int, catalog_type: Optional[str] = None) -> int:
+        """
+        Count total datasets for a specific user with optional filtering.
+        
+        Args:
+            user_id: User ID to filter by
+            catalog_type: Filter by catalog type (gaia, sdss, fits, csv)
+            
+        Returns:
+            Total count of datasets owned by the user
+        """
+        query = self.db.query(DatasetMetadata).filter(
+            DatasetMetadata.user_id == user_id
+        )
+        
+        if catalog_type:
+            query = query.filter(DatasetMetadata.catalog_type == catalog_type)
+        
+        return query.count()
+    
     def count_all(self, catalog_type: Optional[str] = None) -> int:
         """
         Count total datasets with optional filtering.

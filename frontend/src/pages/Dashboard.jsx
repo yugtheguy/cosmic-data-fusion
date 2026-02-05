@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Plot from 'react-plotly.js';
 import { useDataCache } from '../hooks/useDataCache';
-import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,
     Map,
@@ -44,8 +43,91 @@ import SchemaMapper from '../components/SchemaMapper';
 import AILab from '../components/AILab';
 import Harmonizer from '../components/Harmonizer';
 import ResultsTable from '../components/ResultsTable';
-import Sidebar from '../components/Sidebar';
+import CoordinateResolver from '../components/CoordinateResolver';
 import './Dashboard.css';
+
+// Sidebar Navigation Component
+function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters, isLoading, datasets, onDeleteDataset }) {
+    const navigate = useNavigate();
+    const navItems = [
+        { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+        { id: 'coordinate-resolver', icon: Target, label: 'Coordinate Finder' },
+        { id: 'timemachine', icon: Clock, label: 'Time Machine', link: '/timemachine' },
+        { id: 'query', icon: Search, label: 'Query Builder' },
+        { id: 'results', icon: Database, label: 'Data Table' },
+        { id: 'upload', icon: UploadCloud, label: 'Ingest Data' },
+        { id: 'skymap', icon: Map, label: 'Sky Map' },
+        { id: 'anomaly', icon: Brain, label: 'AI Lab' },
+        { id: 'harmonize', icon: Link2, label: 'Harmonizer' },
+        { id: 'export', icon: Download, label: 'Export' },
+        { id: 'planet-hunter', icon: Target, label: 'Planet Hunter', external: true },
+    ];
+
+    return (
+        <aside className="dashboard-sidebar">
+            {/* Logo */}
+            <div className="sidebar-logo">
+                <div className="logo-mark">C</div>
+                <span className="logo-text">COSMIC</span>
+            </div>
+
+            {/* Navigation */}
+            <nav className="sidebar-nav">
+                <div className="nav-section-label">Navigation</div>
+                {navItems.map((item) => (
+                    <button
+                        key={item.id}
+                        className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                        onClick={() => {
+                            if (item.link) {
+                                navigate(item.link);
+                            } else if (item.id === 'query') {
+                                navigate('/query');
+                            } else if (item.id === 'planet-hunter') {
+                                navigate('/planet-hunter');
+                            } else {
+                                setActiveTab(item.id);
+                            }
+                        }}
+                    >
+                        <item.icon size={18} strokeWidth={1.5} />
+                        <span>{item.label}</span>
+                    </button>
+                ))}
+            </nav>
+
+            {/* Filters Section */}
+            <div className="sidebar-filters">
+                <div className="nav-section-label">
+                    <Filter size={14} strokeWidth={1.5} />
+                    Filters
+                </div>
+                <FilterControls
+                    filters={filters}
+                    setFilters={setFilters}
+                    onResetFilters={onResetFilters}
+                    isLoading={isLoading}
+                    datasets={datasets}
+                    onDeleteDataset={onDeleteDataset}
+                />
+            </div>
+
+            {/* User Section */}
+            <div className="sidebar-user">
+                <div className="user-avatar">
+                    <User size={16} strokeWidth={1.5} />
+                </div>
+                <div className="user-info">
+                    <span className="user-name">Researcher</span>
+                    <span className="user-role">Astronomer</span>
+                </div>
+                <button className="logout-btn" title="Logout">
+                    <LogOut size={16} strokeWidth={1.5} />
+                </button>
+            </div>
+        </aside>
+    );
+}
 
 // Filter Controls Component
 function FilterControls({ filters, setFilters, onResetFilters, isLoading, datasets, onDeleteDataset }) {
@@ -1352,23 +1434,13 @@ function Dashboard() {
             <Sidebar
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
-            >
-                {/* Filters Section */}
-                <div className="sidebar-filters">
-                    <div className="nav-section-label">
-                        <Filter size={14} strokeWidth={1.5} />
-                        Filters
-                    </div>
-                    <FilterControls
-                        filters={filters}
-                        setFilters={setFilters}
-                        onResetFilters={handleResetFilters}
-                        isLoading={isLoading}
-                        datasets={datasets}
-                        onDeleteDataset={handleDeleteDataset}
-                    />
-                </div>
-            </Sidebar>
+                filters={filters}
+                setFilters={setFilters}
+                onResetFilters={handleResetFilters}
+                datasets={datasets}
+                onDeleteDataset={handleDeleteDataset}
+                isLoading={isLoading}
+            />
 
             <main className="dashboard-main">
                 <Header 
@@ -1395,6 +1467,8 @@ function Dashboard() {
                     </div>
                 ) : activeTab === 'upload' ? (
                     <UploadView setActiveTab={setActiveTab} onUploadSuccess={handleUploadSuccess} />
+                ) : activeTab === 'coordinate-resolver' ? (
+                    <CoordinateResolver />
                 ) : activeTab === 'anomaly' ? (
                     <AILab />
                 ) : activeTab === 'harmonize' ? (

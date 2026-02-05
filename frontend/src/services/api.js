@@ -244,6 +244,18 @@ export const loadGaiaData = async () => {
     return response.data;
 };
 
+export const loadSDSSData = async () => {
+    // POST /datasets/sdss/load - Load SDSS sample data
+    const response = await api.post('/datasets/sdss/load');
+    return response.data;
+};
+
+export const getConfigurationStatus = async () => {
+    // GET /datasets/config/status - Get configuration status
+    const response = await api.get('/datasets/config/status');
+    return response.data;
+};
+
 export const getDatasets = async () => {
     // GET /datasets - List all datasets
     const response = await api.get('/datasets');
@@ -259,17 +271,20 @@ export const deleteDataset = async (datasetId) => {
 // Ingestion APIs
 // ============================================
 export const uploadData = async (file, onUploadProgress) => {
-    // POST /ingest/auto - Auto-detect and ingest file
-    // Note: If /ingest/auto does not exist, this might fail unless backend was updated. 
-    // For now assuming existing flow or falling back to one of the specific endpoints.
-    // However, for this task, we focus on preview.
-
-    // Fallback logic: try to guess type from extension if 'auto' endpoint missing?
-    // Actually, let's keep it as is, but add previewData.
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post('/ingest/csv', formData, { // defaulting to CSV as generic ingest for now if auto missing
+    // Detect file type from extension
+    const fileName = file.name.toLowerCase();
+    let endpoint = '/ingest/csv'; // default
+    
+    if (fileName.endsWith('.fits') || fileName.endsWith('.fit') || fileName.endsWith('.fits.gz')) {
+        endpoint = '/ingest/fits';
+    } else if (fileName.endsWith('.csv')) {
+        endpoint = '/ingest/csv';
+    }
+
+    const response = await api.post(endpoint, formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
