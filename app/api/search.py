@@ -21,6 +21,7 @@ from app.schemas import (
 )
 from app.services.search import SearchService
 from app.services.gaia import GaiaService
+from app.services.coordinate_parser import CoordinateParser
 from app.repository.star_catalog import StarCatalogRepository
 from app.models import UnifiedStarCatalog
 
@@ -419,3 +420,275 @@ def refresh_star_from_gaia(
     except Exception as e:
         logger.error(f"Error updating star from Gaia: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/coordinate",
+    summary="Flexible coordinate search",
+    description="Search with flexible coordinate formats (sexagesimal, HMS/DMS, mixed notation, etc.). Automatically parses and performs cone search."
+)
+def search_by_coordinate(
+    coordinates: str = Query(
+        ...,
+        description="Coordinates in any format: decimal, sexagesimal (20 54 05.689 +37 01 17.38), HMS/DMS (10:12:45.3-45:17:50), mixed (15h17m-11d10m), etc."
+    ),
+    radius: float = Query(
+        default=2.0,
+        gt=0.0,
+        le=180.0,
+        description="Search radius in arcminutes (default: 2 arcmin)"
+    ),
+    limit: int = Query(
+        default=1000,
+        ge=1,
+        le=10000,
+        description="Maximum results to return"
+    ),
+    db: Session = Depends(get_db)
+):
+    """
+    Search stars using flexible coordinate input formats.
+    
+    Supports multiple coordinate notations:
+    - Decimal degrees: "350.123456 -17.33333"
+    - Sexagesimal: "20 54 05.689 +37 01 17.38"
+    - HMS/DMS: "10:12:45.3 -45:17:50"
+    - Mixed notation: "15h17m-11d10m", "15h17+89d15"
+    - Degrees with suffix: "275d11m15.6954s +17d59m59.876s"
+    - Hybrid: "12.34567h -17.87654d"
+    
+    The coordinate string is parsed and converted to decimal degrees (ICRS J2000),
+    then a cone search is performed with the specified radius.
+    
+    Args:
+        coordinates: Coordinate string in any supported format
+        radius: Search radius in arcminutes (default 2)
+        limit: Maximum number of results
+        db: Database session (injected)
+        
+    Returns:
+        SearchResponse with count, matching stars, and parsed coordinates
+        
+    Raises:
+        HTTPException 400: Invalid coordinate format
+        HTTPException 500: Database error
+        
+    Example:
+        POST /search/coordinate?coordinates=20 54 05.689 +37 01 17.38&radius=5
+    """
+    try:
+        # Parse the coordinate string
+        ra_deg, dec_deg = CoordinateParser.parse(coordinates)
+        
+        logger.info(f"Parsed coordinates: '{coordinates}' -> RA={ra_deg:.6f}°, Dec={dec_deg:.6f}°")
+        
+        # Convert radius from arcminutes to degrees
+        radius_deg = radius / 60.0
+        
+        # Perform cone search
+        service = SearchService(db)
+        stars = service.search_cone(
+            ra=ra_deg,
+            dec=dec_deg,
+            radius=radius_deg,
+            limit=limit
+        )
+        
+        # Convert to StarRecord format
+        from app.api.query import StarRecord
+        records = []
+        for star in stars:
+            records.append(StarRecord(
+                id=star.id,
+                source_id=star.source_id,
+                ra_deg=star.ra_deg,
+                dec_deg=star.dec_deg,
+                brightness_mag=star.brightness_mag,
+                parallax_mas=star.parallax_mas,
+                distance_pc=star.distance_pc,
+                original_source=star.original_source,
+                dataset_id=star.dataset_id
+            ))
+        
+        # Return standardized format with parsed coordinates
+        return {
+            "success": True,
+            "total_count": len(records),
+            "records": records,
+            "parsed_coordinates": {
+                "ra_deg": ra_deg,
+                "dec_deg": dec_deg,
+                "input_format": coordinates
+            },
+            "search_params": {
+                "radius_arcmin": radius,
+                "radius_deg": radius_deg
+            }
+        }
+        
+    except ValueError as e:
+        # Coordinate parsing error
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid coordinate format: {str(e)}"
+        )
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during coordinate search: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+
+
+@router.post(
+    "/coordinate/batch",
+    summary="Batch coordinate search",
+    description="Upload a list of coordinates and search for matches in the catalog. Supports multiple coordinate formats."
+)
+def search_batch_coordinates(
+    coordinates: list[str] = Query(
+        ...,
+        description="List of coordinate strings in any supported format"
+    ),
+    radius: float = Query(
+        default=2.0,
+        gt=0.0,
+        le=180.0,
+        description="Search radius in arcminutes for each coordinate"
+    ),
+    limit_per_coordinate: int = Query(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum results per coordinate"
+    ),
+    db: Session = Depends(get_db)
+):
+    """
+    Batch search multiple coordinates at once.
+    
+    Accepts a list of coordinate strings in any supported format,
+    parses each one, and performs a cone search for each.
+    
+    Useful for cross-matching observations or checking multiple targets.
+    
+    Args:
+        coordinates: List of coordinate strings
+        radius: Search radius in arcminutes (applied to all)
+        limit_per_coordinate: Max results per coordinate
+        db: Database session (injected)
+        
+    Returns:
+        Dictionary with results for each coordinate, including parse status
+        
+    Raises:
+        HTTPException 400: If all coordinates fail to parse
+        HTTPException 500: Database error
+        
+    Example:
+        POST /search/coordinate/batch
+        Body: {
+            "coordinates": ["20 54 05.689 +37 01 17.38", "15h17m-11d10m"],
+            "radius": 5,
+            "limit_per_coordinate": 10
+        }
+    """
+    if not coordinates or len(coordinates) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No coordinates provided"
+        )
+    
+    if len(coordinates) > 1000:
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum 1000 coordinates per batch. For larger batches, use multiple requests."
+        )
+    
+    try:
+        radius_deg = radius / 60.0
+        service = SearchService(db)
+        
+        results = []
+        parse_errors = 0
+        
+        for idx, coord_string in enumerate(coordinates):
+            result = {
+                "index": idx,
+                "input": coord_string,
+                "success": False,
+                "parsed_coordinates": None,
+                "matches": [],
+                "match_count": 0,
+                "error": None
+            }
+            
+            try:
+                # Parse coordinate
+                ra_deg, dec_deg = CoordinateParser.parse(coord_string)
+                result["parsed_coordinates"] = {
+                    "ra_deg": ra_deg,
+                    "dec_deg": dec_deg
+                }
+                
+                # Search
+                stars = service.search_cone(
+                    ra=ra_deg,
+                    dec=dec_deg,
+                    radius=radius_deg,
+                    limit=limit_per_coordinate
+                )
+                
+                # Convert to records
+                from app.api.query import StarRecord
+                records = []
+                for star in stars:
+                    records.append(StarRecord(
+                        id=star.id,
+                        source_id=star.source_id,
+                        ra_deg=star.ra_deg,
+                        dec_deg=star.dec_deg,
+                        brightness_mag=star.brightness_mag,
+                        parallax_mas=star.parallax_mas,
+                        distance_pc=star.distance_pc,
+                        original_source=star.original_source,
+                        dataset_id=star.dataset_id
+                    ))
+                
+                result["matches"] = records
+                result["match_count"] = len(records)
+                result["success"] = True
+                
+            except ValueError as e:
+                # Parsing error for this coordinate
+                result["error"] = f"Parse error: {str(e)}"
+                parse_errors += 1
+            except Exception as e:
+                result["error"] = f"Search error: {str(e)}"
+                parse_errors += 1
+            
+            results.append(result)
+        
+        # Return batch results
+        successful = len(coordinates) - parse_errors
+        
+        return {
+            "success": True,
+            "total_coordinates": len(coordinates),
+            "successful_parses": successful,
+            "failed_parses": parse_errors,
+            "search_params": {
+                "radius_arcmin": radius,
+                "radius_deg": radius_deg,
+                "limit_per_coordinate": limit_per_coordinate
+            },
+            "results": results
+        }
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during batch coordinate search: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+
