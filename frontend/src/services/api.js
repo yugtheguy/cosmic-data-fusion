@@ -10,6 +10,51 @@ const api = axios.create({
     },
 });
 
+// Add a request interceptor to attach the token
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
+// ============================================
+// Authentication APIs
+// ============================================
+export const login = async (email, password) => {
+    const formData = new FormData();
+    formData.append('username', email); // OAuth2 expects 'username'
+    formData.append('password', password);
+
+    const response = await api.post('/auth/login', formData, {
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+    });
+    return response.data;
+};
+
+export const register = async (userData) => {
+    const response = await api.post('/auth/register', userData);
+    return response.data;
+};
+
+export const getCurrentUser = async () => {
+    const response = await api.get('/auth/me');
+    return response.data;
+};
+
+export const updateProfile = async (userData) => {
+    const response = await api.put('/auth/me', userData);
+    return response.data;
+};
+
 // ============================================
 // Health Check
 // ============================================
