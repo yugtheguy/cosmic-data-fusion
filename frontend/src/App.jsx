@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { DataCacheProvider } from './contexts/DataCacheContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
@@ -14,7 +15,8 @@ import CosmicChat from './components/CosmicChat';
 function App() {
     return (
         <AuthProvider>
-            <Router>
+            <DataCacheProvider>
+                <Router>
                 <Routes>
                     <Route path="/" element={<LandingPage />} />
                     <Route path="/login" element={<LoginPage />} />
@@ -68,6 +70,7 @@ function App() {
                     },
                 }}
             />
+            </DataCacheProvider>
         </AuthProvider>
     );
 }

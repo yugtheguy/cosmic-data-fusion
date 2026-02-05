@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Plot from 'react-plotly.js';
+import { useDataCache } from '../hooks/useDataCache';
 import {
     LayoutDashboard,
     Map,
@@ -264,12 +265,42 @@ function FilterControls({ filters, setFilters, onResetFilters, isLoading, datase
 }
 
 // Header Component
-function Header({ onExport }) {
+function Header({ onExport, onRefresh, cacheStatus }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [showExportMenu, setShowExportMenu] = useState(false);
 
     return (
         <header className="dashboard-header">
+            {/* Cache Status */}
+            {cacheStatus && (
+                <div className="cache-status" style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '10px',
+                    marginRight: '20px',
+                    fontSize: '0.85rem',
+                    color: '#888'
+                }}>
+                    <span>
+                        Cache: {cacheStatus.fresh ? '✓ Fresh' : '⚠ Stale'}
+                        {cacheStatus.age && ` (${Math.floor(cacheStatus.age / 1000)}s old)`}
+                    </span>
+                    <button 
+                        onClick={onRefresh}
+                        style={{
+                            padding: '4px 8px',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            background: '#2a2a4a',
+                            color: '#fff',
+                            border: '1px solid #444',
+                            borderRadius: '4px'
+                        }}
+                    >
+                        ↻ Refresh
+                    </button>
+                </div>
+            )}
             {/* Search Bar */}
             <div className="header-search">
                 <Search size={16} strokeWidth={1.5} />
@@ -1108,6 +1139,9 @@ function UploadView({ setActiveTab, onUploadSuccess }) {
 function Dashboard() {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
+    
+    // Cache integration
+    const { getCached, updateCache, cacheMetadata, invalidateCache, CACHE_KEYS } = useDataCache();
 
     // Initialize state from URL or defaults
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
@@ -1129,6 +1163,7 @@ function Dashboard() {
     const [stats, setStats] = useState({});
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [cacheStatus, setCacheStatus] = useState(null);
 
     // Sync state changes to URL
     useEffect(() => {
@@ -1206,6 +1241,10 @@ function Dashboard() {
 
         try {
             await deleteDataset(datasetId);
+            // Invalidate caches since data has changed
+            invalidateCache(CACHE_KEYS.STARS);
+            invalidateCache(CACHE_KEYS.DATASETS);
+            invalidateCache(CACHE_KEYS.ANOMALIES);
             // Refresh datasets
             fetchDatasets();
             // Clear from filters if selected
@@ -1224,6 +1263,34 @@ function Dashboard() {
             setError('Failed to delete dataset.');
         }
     };
+
+    // Handle upload success - invalidate caches and refresh datasets
+    const handleUploadSuccess = useCallback(() => {
+        console.log('📤 Upload successful - invalidating caches');
+        // Invalidate all caches since new data has been uploaded
+        invalidateCache(CACHE_KEYS.STARS);
+        invalidateCache(CACHE_KEYS.ANOMALIES);
+        invalidateCache(CACHE_KEYS.DATASETS);
+        invalidateCache(CACHE_KEYS.HARMONIZE_STATS);
+        // Fetch updated datasets list
+        fetchDatasets();
+        // Optionally refresh stars data
+        fetchStarsData();
+    }, [invalidateCache, CACHE_KEYS, fetchDatasets, fetchStarsData]);
+
+    // Manual refresh handler
+    const handleManualRefresh = useCallback(() => {
+        console.log('🔄 Manual refresh triggered');
+        // Invalidate all caches
+        invalidateCache(CACHE_KEYS.STARS);
+        invalidateCache(CACHE_KEYS.ANOMALIES);
+        invalidateCache(CACHE_KEYS.DATASETS);
+        invalidateCache(CACHE_KEYS.HARMONIZE_STATS);
+        // Reset cache status
+        setCacheStatus(null);
+        // Reload the page to fetch fresh data
+        window.location.reload();
+    }, [invalidateCache, CACHE_KEYS]);
 
     // Auto-apply filters with debounce
     useEffect(() => {
@@ -1248,6 +1315,42 @@ function Dashboard() {
             setError(null);
 
             try {
+                // Check cache first
+                const cachedStars = getCached(CACHE_KEYS.STARS);
+                const cachedAnomalies = getCached(CACHE_KEYS.ANOMALIES);
+                const cachedDatasets = getCached(CACHE_KEYS.DATASETS);
+                const cachedStats = getCached(CACHE_KEYS.HARMONIZE_STATS);
+
+                // If we have fresh cached data, use it
+                if (cachedStars && cachedStars.fresh) {
+                    console.log('✅ Using cached stars data');
+                    setStars(cachedStars.data.records || []);
+                    setCacheStatus(cacheMetadata[CACHE_KEYS.STARS]);
+                    
+                    if (cachedAnomalies && cachedAnomalies.fresh) {
+                        setAnomalies(cachedAnomalies.data || []);
+                    }
+                    
+                    if (cachedDatasets && cachedDatasets.fresh) {
+                        setDatasets(cachedDatasets.data || []);
+                    }
+                    
+                    if (cachedStats && cachedStats.fresh) {
+                        const cachedStatsData = cachedStats.data;
+                        setStats({
+                            totalStars: cachedStars.data.total_count || cachedStars.data.records?.length || 0,
+                            fusionGroups: cachedStatsData.unique_fusion_groups || 0,
+                            anomalyCount: cachedAnomalies?.data?.length || 0,
+                            sources: 2,
+                        });
+                    }
+                    
+                    setIsLoading(false);
+                    return; // Skip API calls
+                }
+
+                console.log('🔄 Fetching fresh data from API');
+
                 // Check health first
                 await checkHealth();
 
@@ -1258,6 +1361,8 @@ function Dashboard() {
                 let starsResponse;
                 try {
                     starsResponse = await searchStars({ limit: 5000 });
+                    // Cache the response
+                    updateCache(CACHE_KEYS.STARS, starsResponse);
                 } catch (starErr) {
                     console.error('Failed to fetch stars:', starErr);
                     starsResponse = { records: [], total_count: 0 };
@@ -1274,6 +1379,8 @@ function Dashboard() {
                 let anomaliesResponse = { anomalies: [], anomaly_count: 0 };
                 try {
                     anomaliesResponse = await detectAnomalies(0.05);
+                    // Cache anomalies
+                    updateCache(CACHE_KEYS.ANOMALIES, anomaliesResponse.anomalies || []);
                 } catch (anomalyErr) {
                     // Handle insufficient data gracefully
                     console.warn('Anomaly detection failed (likely insufficient data):', anomalyErr);
@@ -1285,6 +1392,8 @@ function Dashboard() {
                 let statsResponse = { unique_fusion_groups: 0 };
                 try {
                     statsResponse = await getHarmonizationStats();
+                    // Cache stats
+                    updateCache(CACHE_KEYS.HARMONIZE_STATS, statsResponse);
                 } catch (statsErr) {
                     console.warn('Harmonization stats failed:', statsErr);
                 }
@@ -1295,6 +1404,8 @@ function Dashboard() {
                     anomalyCount: anomaliesResponse.anomaly_count || 0,
                     sources: 2, // Gaia + TESS
                 });
+
+                setCacheStatus(cacheMetadata[CACHE_KEYS.STARS]);
 
             } catch (err) {
                 console.error('Failed to fetch data:', err);
@@ -1330,7 +1441,11 @@ function Dashboard() {
             />
 
             <main className="dashboard-main">
-                <Header onExport={handleExport} />
+                <Header 
+                    onExport={handleExport} 
+                    onRefresh={handleManualRefresh}
+                    cacheStatus={cacheStatus}
+                />
 
                 {error ? (
                     <div className="error-banner">
@@ -1349,7 +1464,7 @@ function Dashboard() {
                         />
                     </div>
                 ) : activeTab === 'upload' ? (
-                    <UploadView setActiveTab={setActiveTab} onUploadSuccess={fetchDatasets} />
+                    <UploadView setActiveTab={setActiveTab} onUploadSuccess={handleUploadSuccess} />
                 ) : activeTab === 'anomaly' ? (
                     <AILab />
                 ) : activeTab === 'harmonize' ? (
