@@ -37,7 +37,7 @@ import {
 import TimelineController from '../components/TimelineController';
 import UncertaintyCone from '../components/UncertaintyCone';
 import ConfidenceHeatmap from '../components/ConfidenceHeatmap';
-import Sidebar from '../components/Sidebar';
+import CelestialSphere3D from '../components/CelestialSphere3D';
 import historicalFacts from '../data/historicalFacts.json';
 import './TimeMachine.css';
 
@@ -81,12 +81,12 @@ function TimeMachine() {
 
     // Filters
     const [filters, setFilters] = useState({
-        raMin: 50,
-        raMax: 65,
-        decMin: 20,
-        decMax: 30,
-        maxMagnitude: 15,
-        limit: 500
+        raMin: 0,
+        raMax: 180,
+        decMin: -20,
+        decMax: 40,
+        maxMagnitude: 13,
+        limit: 2000
     });
 
     // Stats
@@ -108,6 +108,8 @@ function TimeMachine() {
     const [showUncertainty, setShowUncertainty] = useState(true); // NEW: Show uncertainty cones
     const [showHeatmap, setShowHeatmap] = useState(true); // NEW: Show confidence heatmap
     const [hoveredStar, setHoveredStar] = useState(null); // NEW: Track hovered star for tooltip
+    const [view3D, setView3D] = useState(false); // Toggle between 2D and 3D view
+    const [showFilters, setShowFilters] = useState(true); // Show/hide filter panel in 3D mode
 
     // Region Selection for Query Builder integration
     const [selectionMode, setSelectionMode] = useState(false); // Toggle selection mode
@@ -231,7 +233,7 @@ function TimeMachine() {
 
         // Trigger time warp effect for jumps > 500 years
         // BUT skip warp effect if timeline is playing (continuous animation)
-        if (epochDiff > 500 && !isWarping && !isPlaying) {
+        if (epochDiff > 500 && !isWarping && !isPlaying && !isAnimating) {
             const direction = currentEpoch > previousEpoch ? 'FUTURE' : 'PAST';
             const message = direction === 'FUTURE'
                 ? `WARPING ${epochDiff.toLocaleString()} YEARS INTO THE FUTURE`
@@ -250,26 +252,26 @@ function TimeMachine() {
         }
 
         // CRITICAL FIX: Skip API calls entirely during animation to prevent flickering
-        // Only fetch data when timeline is NOT playing
-        if (!isPlaying) {
+        // Only fetch data when timeline is NOT playing AND NOT animating frames
+        if (!isPlaying && !isAnimating) {
             const timer = setTimeout(() => {
                 fetchStarsAtEpoch(currentEpoch);
             }, 300);
 
             return () => clearTimeout(timer);
         }
-    }, [currentEpoch, fetchStarsAtEpoch, isPlaying, isWarping, previousEpoch]);
+    }, [currentEpoch, fetchStarsAtEpoch, isPlaying, isAnimating, isWarping, previousEpoch]);
 
     // Fetch data when animation stops to show final epoch
     useEffect(() => {
-        if (!isPlaying) {
+        if (!isPlaying && !isAnimating) {
             // Small delay to let the final epoch settle
             const timer = setTimeout(() => {
                 fetchStarsAtEpoch(currentEpoch);
             }, 100);
             return () => clearTimeout(timer);
         }
-    }, [isPlaying, currentEpoch, fetchStarsAtEpoch]);
+    }, [isPlaying, isAnimating, currentEpoch, fetchStarsAtEpoch]);
 
 
     // Handle filter apply
@@ -547,6 +549,270 @@ function TimeMachine() {
         }
     }, [animationSpeed, isAnimating, animationFrames.length]);
 
+    // Memoize plot data to prevent re-renders
+    const plotData = useMemo(() => {
+        // Derived fast movers list (in case it's not defined elsewhere)
+        const fastMoversList = stars.filter(s => s.total_pm && s.total_pm > 50).slice(0, 50);
+
+        // Helper for uncertainty colors
+        const getUncertaintyColor = (uncertaintyClass) => {
+            const colors = {
+                'high_confidence': 'rgba(0, 255, 136, 0.15)',
+                'acceptable': 'rgba(255, 235, 59, 0.15)',
+                'approximate': 'rgba(255, 152, 0, 0.2)',
+                'extreme_range': 'rgba(244, 67, 54, 0.25)',
+                'unreliable': 'rgba(183, 28, 28, 0.3)'
+            };
+            return colors[uncertaintyClass] || 'rgba(150, 150, 150, 0.15)';
+        };
+
+        const traces = [
+            // Main stars trace
+            {
+                type: 'scatter',
+                mode: 'markers',
+                name: 'Stars',
+                x: stars.map(s => s.ra_at_epoch),
+                y: stars.map(s => s.dec_at_epoch),
+                marker: {
+                    size: stars.map(s => Math.max(2, 15 - s.brightness_mag)),
+                    color: stars.map(s =>
+                        s.uncertainty_class === 'high_confidence' ? '#4a9f6e' :
+                            s.uncertainty_class === 'acceptable' ? '#e8a87c' :
+                                s.uncertainty_class === 'approximate' ? '#f59e0b' :
+                                    '#ef4444'
+                    ),
+                    opacity: 0.8,
+                    line: { width: 0 }
+                },
+                text: stars.map(s =>
+                    `ID: ${s.id}<br>` +
+                    `RA: ${s.ra_at_epoch?.toFixed(4) || 'N/A'}°<br>` +
+                    `Dec: ${s.dec_at_epoch?.toFixed(4) || 'N/A'}°<br>` +
+                    `Mag: ${s.brightness_mag?.toFixed(2) || 'N/A'}<br>` +
+                    `PM: ${s.total_pm?.toFixed(2) || 'N/A'} mas/yr<br>` +
+                    `Uncertainty: ${s.uncertainty_arcsec?.toFixed(2) || 'N/A'}″<br>` +
+                    `<i>Click to view details</i>`
+                ),
+                hovertemplate: '%{text}<extra></extra>',
+                customdata: stars.map(s => s.id)
+            },
+            // Highlight ring for selected star
+            ...(selectedStarId ? (() => {
+                // Try to find in loaded stars first
+                let selectedStar = stars.find(s => s.id === selectedStarId);
+
+                // If not found, try quick derived list
+                if (!selectedStar) {
+                    const fastMover = fastMoversList.find(s => s.id === selectedStarId);
+                    if (fastMover) {
+                        selectedStar = {
+                            ra_at_epoch: fastMover.ra_deg, // Use original coords if unavailable, or maybe derived?
+                            dec_at_epoch: fastMover.dec_deg
+                        };
+                    }
+                }
+
+                if (selectedStar) {
+                    return [{
+                        type: 'scatter',
+                        mode: 'markers',
+                        name: 'Selected',
+                        x: [selectedStar.ra_at_epoch],
+                        y: [selectedStar.dec_at_epoch],
+                        marker: {
+                            size: 35,
+                            color: 'rgba(255, 215, 0, 0.3)',
+                            line: {
+                                color: '#ffd700',
+                                width: 3
+                            },
+                            symbol: 'circle-open'
+                        },
+                        hoverinfo: 'skip',
+                        showlegend: false
+                    }];
+                }
+                return [];
+            })() : []),
+
+            // Star trails
+            ...(showTrails ? (() => {
+                const starsWithPM = stars.filter(s => s.pmra && s.pmdec);
+                const topMovers = starsWithPM
+                    .sort((a, b) => (b.total_pm || 0) - (a.total_pm || 0))
+                    .slice(0, 50);
+
+                return topMovers.map((s, idx) => ({
+                    type: 'scatter',
+                    mode: 'lines',
+                    x: [s.ra_deg, s.ra_at_epoch],
+                    y: [s.dec_deg, s.dec_at_epoch],
+                    line: {
+                        color: `rgba(212, 104, 58, ${0.6 - idx * 0.01})`,
+                        width: 1.5
+                    },
+                    hoverinfo: 'skip',
+                    showlegend: false
+                }));
+            })() : []),
+
+            // Movement vectors
+            ...(showVectors ? (() => {
+                const starsWithPM = stars.filter(s => s.pmra && s.pmdec && s.total_pm > 20);
+                const topMovers = starsWithPM.slice(0, 30);
+
+                return topMovers.map(s => {
+                    const scale = 0.5;
+                    const arrowEndRA = s.ra_at_epoch + (s.pmra / 3600000) * 1000 * scale;
+                    const arrowEndDec = s.dec_at_epoch + (s.pmdec / 3600000) * 1000 * scale;
+
+                    return {
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        x: [s.ra_at_epoch, arrowEndRA],
+                        y: [s.dec_at_epoch, arrowEndDec],
+                        line: { color: '#00bfff', width: 2 },
+                        marker: {
+                            size: [0, 8],
+                            color: '#00bfff',
+                            symbol: 'triangle-up'
+                        },
+                        hoverinfo: 'skip',
+                        showlegend: false
+                    };
+                });
+            })() : []),
+
+            // Comparison overlay
+            ...(compareMode ? (() => {
+                const ancientStars = stars.filter(s => s.pmra && s.pmdec).map(s => {
+                    const yearsBack = currentEpoch - compareEpoch;
+                    const pmraPerYear = s.pmra / 3600000;
+                    const pmdecPerYear = s.pmdec / 3600000;
+                    const ancient_ra = s.ra_at_epoch - pmraPerYear * yearsBack;
+                    const ancient_dec = s.dec_at_epoch - pmdecPerYear * yearsBack;
+                    const distance = Math.sqrt(
+                        Math.pow(s.ra_at_epoch - ancient_ra, 2) +
+                        Math.pow(s.dec_at_epoch - ancient_dec, 2)
+                    );
+                    return { ...s, ancient_ra, ancient_dec, distance };
+                });
+
+                const topMovers = ancientStars
+                    .filter(s => s.distance > 0.01)
+                    .sort((a, b) => b.distance - a.distance)
+                    .slice(0, 20);
+
+                const colors = topMovers.map((_, i) =>
+                    `hsl(${35 + i * 5}, 100%, ${70 - i * 2}%)`
+                );
+
+                return [
+                    {
+                        type: 'scatter',
+                        mode: 'markers+text',
+                        name: `${Math.abs(compareEpoch)} ${compareEpoch < 0 ? 'BC' : 'AD'}`,
+                        x: topMovers.map(s => s.ancient_ra),
+                        y: topMovers.map(s => s.ancient_dec),
+                        text: topMovers.map((_, i) => `${i + 1}`),
+                        textposition: 'top center',
+                        textfont: { size: 9, color: '#fff' },
+                        marker: {
+                            size: topMovers.map((_, i) => 18 - i * 0.5),
+                            color: colors,
+                            line: { color: '#fff', width: 1.5 },
+                            symbol: 'diamond'
+                        },
+                        hovertemplate: '<b>Ancient Position</b><br>RA: %{x:.4f}°<br>Dec: %{y:.4f}°<extra></extra>'
+                    },
+                    ...topMovers.map((s, i) => ({
+                        type: 'scatter',
+                        mode: 'lines',
+                        x: [s.ancient_ra, s.ra_at_epoch],
+                        y: [s.ancient_dec, s.dec_at_epoch],
+                        line: {
+                            color: colors[i],
+                            width: Math.max(1.5, 3 - i * 0.1)
+                        },
+                        hoverinfo: 'skip',
+                        showlegend: false
+                    }))
+                ];
+            })() : []),
+
+            // Uncertainty visualization
+            ...(showUncertainty ? (() => {
+                try {
+                    const starsWithUncertainty = stars.filter(s =>
+                        s.uncertainty_deg !== undefined &&
+                        s.uncertainty_deg !== null &&
+                        s.uncertainty_arcsec < 999999 &&
+                        !isNaN(s.uncertainty_deg)
+                    );
+                    const limitedStars = starsWithUncertainty.slice(0, 50);
+
+                    return limitedStars.map((star, idx) => {
+                        const radius = Math.max(0.01, star.uncertainty_deg * 2);
+                        const numPoints = 20;
+                        const angles = Array.from({ length: numPoints + 1 }, (_, i) => (i / numPoints) * 2 * Math.PI);
+                        const circleX = angles.map(a => star.ra_at_epoch + radius * Math.cos(a));
+                        const circleY = angles.map(a => star.dec_at_epoch + radius * Math.sin(a));
+
+                        return {
+                            type: 'scatter',
+                            mode: 'lines',
+                            x: circleX,
+                            y: circleY,
+                            fill: 'toself',
+                            fillcolor: getUncertaintyColor(star.uncertainty_class),
+                            line: {
+                                color: getUncertaintyColor(star.uncertainty_class).replace('0.15', '0.4'),
+                                width: 1
+                            },
+                            hoverinfo: 'skip',
+                            showlegend: false,
+                            name: `Uncertainty ${idx}`
+                        };
+                    });
+                } catch (error) {
+                    console.error('Error rendering uncertainty circles:', error);
+                    return [];
+                }
+            })() : [])
+        ];
+
+        return traces.flat();
+    }, [stars, selectedStarId, showTrails, showVectors, compareMode, compareEpoch, currentEpoch, showUncertainty]);
+
+    // Memoize layout
+    // Memoize layout
+    const plotLayout = useMemo(() => ({
+        title: null,
+        xaxis: {
+            title: 'Right Ascension (°)',
+            gridcolor: 'rgba(255, 255, 255, 0.1)',
+            color: '#888888',
+            range: [filters.raMax, filters.raMin], // Reversed for astronomy
+            autorange: false
+        },
+        yaxis: {
+            title: 'Declination (°)',
+            gridcolor: 'rgba(255, 255, 255, 0.1)',
+            color: '#888888',
+            range: [filters.decMin, filters.decMax],
+            autorange: false
+        },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'rgba(15, 15, 15, 0.5)',
+        font: { family: 'Inter, sans-serif', color: '#e5e5e5' },
+        margin: { l: 60, r: 20, t: 20, b: 60 },
+        hovermode: 'closest',
+        dragmode: selectionMode ? 'select' : 'pan',
+        // Preserve user zoom if interaction occurred (optional, but good practice specific to Plotly interactions)
+        uirevision: 'true'
+    }), [selectionMode, filters.raMin, filters.raMax, filters.decMin, filters.decMax]);
+
     return (
         <>
             {/* TIME WARP OVERLAY - Full screen immersive effect */}
@@ -582,7 +848,7 @@ function TimeMachine() {
                 </div>
             )}
 
-            <div className={`dashboard ${isWarping ? 'warping' : ''} ${isFullscreen ? 'fullscreen-mode' : ''}`}>
+            <div className={`dashboard ${isWarping ? 'warping' : ''} ${isFullscreen ? 'fullscreen-mode' : ''} ${view3D ? 'view-3d-fullscreen' : ''}`}>
                 {/* Ambient Starfield Background */}
                 <div className="ambient-starfield">
                     {[...Array(30)].map((_, i) => (
@@ -599,7 +865,95 @@ function TimeMachine() {
                 </div>
 
                 {/* Sidebar */}
-                <Sidebar activeTab={activeTab} setActiveTab={setActiveTab}>
+                {!view3D && (
+                <aside className="dashboard-sidebar">
+                    {/* Logo */}
+                    <div className="sidebar-logo">
+                        <div className="logo-mark">C</div>
+                        <span className="logo-text">COSMIC</span>
+                    </div>
+
+                    {/* Navigation */}
+                    <nav className="sidebar-nav">
+                        <div className="nav-section-label">Navigation</div>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/dashboard?tab=overview')}
+                        >
+                            <LayoutDashboard size={18} strokeWidth={1.5} />
+                            <span>Overview</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/dashboard?tab=coordinate-resolver')}
+                        >
+                            <Target size={18} strokeWidth={1.5} />
+                            <span>Coordinate Finder</span>
+                        </button>
+                        <button
+                            className="nav-item active"
+                        >
+                            <Clock size={18} strokeWidth={1.5} />
+                            <span>Time Machine</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/query')}
+                        >
+                            <Search size={18} strokeWidth={1.5} />
+                            <span>Query Builder</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/dashboard?tab=results')}
+                        >
+                            <Database size={18} strokeWidth={1.5} />
+                            <span>Data Table</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/dashboard?tab=upload')}
+                        >
+                            <UploadCloud size={18} strokeWidth={1.5} />
+                            <span>Ingest Data</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/dashboard?tab=skymap')}
+                        >
+                            <Map size={18} strokeWidth={1.5} />
+                            <span>Sky Map</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/dashboard?tab=anomaly')}
+                        >
+                            <Brain size={18} strokeWidth={1.5} />
+                            <span>AI Lab</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/dashboard?tab=harmonize')}
+                        >
+                            <Link2 size={18} strokeWidth={1.5} />
+                            <span>Harmonizer</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/dashboard?tab=export')}
+                        >
+                            <Download size={18} strokeWidth={1.5} />
+                            <span>Export</span>
+                        </button>
+                        <button
+                            className="nav-item"
+                            onClick={() => navigate('/planet-hunter')}
+                        >
+                            <Target size={18} strokeWidth={1.5} />
+                            <span>Planet Hunter</span>
+                        </button>
+                    </nav>
+
                     {/* Filters */}
                     <div className="sidebar-filters">
                         <div className="nav-section-label">
@@ -734,11 +1088,34 @@ function TimeMachine() {
                             </div>
                         )}
                     </div>
-                </Sidebar>
+
+                    {/* User Section */}
+                    <div className="sidebar-user">
+                        <div className="user-avatar">
+                            <User size={16} strokeWidth={1.5} />
+                        </div>
+                        <div className="user-info">
+                            <span className="user-name">{user?.full_name || user?.email || 'Researcher'}</span>
+                            <span className="user-role">Astronomer</span>
+                        </div>
+                        <button
+                            className="logout-btn"
+                            title="Logout"
+                            onClick={() => {
+                                logout();
+                                navigate('/login');
+                            }}
+                        >
+                            <LogOut size={16} strokeWidth={1.5} />
+                        </button>
+                    </div>
+                </aside>
+                )}
 
                 {/* Main Content */}
-                <main className="dashboard-main">
+                <main className={`dashboard-main ${view3D ? 'fullscreen-3d' : ''}`}>
                     {/* Header */}
+                    {!view3D && (
                     <header className="dashboard-header">
                         <h1 className="page-title">
                             <Clock size={24} />
@@ -750,8 +1127,10 @@ function TimeMachine() {
                             </div>
                         </div>
                     </header>
+                    )}
 
                     {/* Stats Row */}
+                    {!view3D && (
                     <div className="stats-row">
                         <div className="stat-card">
                             <div className="stat-icon">
@@ -795,9 +1174,10 @@ function TimeMachine() {
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Historical Context Card */}
-                    {historicalContext && (
+                    {historicalContext && !view3D && (
                         <div className="historical-context-card" key={historicalContext.year}>
                             <div className="context-icon">
                                 <BookOpen size={24} />
@@ -814,83 +1194,103 @@ function TimeMachine() {
 
                     {/* Sky Map */}
 
-                    <div className="skymap-container">
-                        <div className="skymap-header">
-                            <h2>
-                                <Map size={18} />
-                                Temporal Star Map
-                            </h2>
+                    <div className={`skymap-container ${view3D ? 'immersive-3d' : ''}`}>
+                        <div className={`skymap-header ${view3D ? 'minimal' : ''}`}>
+                            {!view3D && (
+                                <h2>
+                                    <Map size={18} />
+                                    Temporal Star Map
+                                </h2>
+                            )}
                             <div className="skymap-info">
                                 <div className="skymap-toggles">
                                     <button
-                                        className={`toggle-btn ${showTrails ? 'active' : ''}`}
-                                        onClick={() => setShowTrails(!showTrails)}
-                                        title="Show star trails over time"
-                                    >
-                                        Trails
-                                    </button>
-                                    <button
-                                        className={`toggle-btn ${showVectors ? 'active' : ''}`}
-                                        onClick={() => setShowVectors(!showVectors)}
-                                        title="Show movement vectors"
-                                    >
-                                        Vectors
-                                    </button>
-                                    <button
-                                        className={`toggle-btn ${showUncertainty ? 'active' : ''}`}
-                                        onClick={() => setShowUncertainty(!showUncertainty)}
-                                        title="Show uncertainty cones (prediction confidence)"
-                                    >
-                                        <Target size={14} /> Uncertainty
-                                    </button>
-                                    <button
-                                        className={`toggle-btn ${showHeatmap ? 'active' : ''}`}
-                                        onClick={() => setShowHeatmap(!showHeatmap)}
-                                        title="Show confidence heatmap background"
-                                    >
-                                        <Layers size={14} /> Heatmap
-                                    </button>
-                                    <button
-                                        className={`toggle-btn ${selectionMode ? 'active' : ''}`}
-                                        onClick={() => {
-                                            setSelectionMode(!selectionMode);
-                                            if (selectionMode) {
-                                                // Clear selection when turning off selection mode
-                                                setSelectedStars(null);
-                                                setSelectionCount(0);
-                                            }
+                                        className={`toggle-btn ${view3D ? 'active' : ''}`}
+                                        onClick={() => setView3D(!view3D)}
+                                        title="Toggle 3D celestial sphere view"
+                                        style={{
+                                            background: view3D ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' : '',
+                                            fontWeight: view3D ? '600' : '500',
+                                            position: view3D ? 'absolute' : 'relative',
+                                            top: view3D ? '1rem' : 'auto',
+                                            right: view3D ? '1rem' : 'auto',
+                                            zIndex: view3D ? '100' : 'auto'
                                         }}
-                                        title="Select stars to query in Query Builder"
                                     >
-                                        <MapPin size={14} /> Select Region
+                                        <Layers size={14} /> {view3D ? 'Exit 3D' : '2D'}
                                     </button>
-                                    <button
-                                        className={`toggle-btn compare ${compareMode ? 'active' : ''}`}
-                                        onClick={() => setCompareMode(!compareMode)}
-                                        title="Compare with ancient epoch (3000 BC)"
-                                    >
-                                        Compare
-                                    </button>
-                                    <button
-                                        className={`toggle-btn fullscreen ${isFullscreen ? 'active' : ''}`}
-                                        onClick={() => setIsFullscreen(!isFullscreen)}
-                                        title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen study mode'}
-                                    >
-                                        {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                                    </button>
-                                    <button
-                                        className={`toggle-btn export ${isExporting ? 'loading' : ''}`}
-                                        onClick={() => handleExport('csv')}
-                                        disabled={isExporting || stars.length === 0}
-                                        title="Export current view as CSV"
-                                    >
-                                        {isExporting ? <RefreshCw size={14} className="spin" /> : <Download size={14} />}
-                                    </button>
+                                    {!view3D && (
+                                        <>
+                                            <button
+                                                className={`toggle-btn ${showTrails ? 'active' : ''}`}
+                                                onClick={() => setShowTrails(!showTrails)}
+                                                title="Show star trails over time"
+                                            >
+                                                Trails
+                                            </button>
+                                            <button
+                                                className={`toggle-btn ${showVectors ? 'active' : ''}`}
+                                                onClick={() => setShowVectors(!showVectors)}
+                                                title="Show movement vectors"
+                                            >
+                                                Vectors
+                                            </button>
+                                            <button
+                                                className={`toggle-btn ${showUncertainty ? 'active' : ''}`}
+                                                onClick={() => setShowUncertainty(!showUncertainty)}
+                                                title="Show uncertainty cones (prediction confidence)"
+                                            >
+                                                <Target size={14} /> Uncertainty
+                                            </button>
+                                            <button
+                                                className={`toggle-btn ${showHeatmap ? 'active' : ''}`}
+                                                onClick={() => setShowHeatmap(!showHeatmap)}
+                                                title="Show confidence heatmap background"
+                                            >
+                                                <Layers size={14} /> Heatmap
+                                            </button>
+                                            <button
+                                                className={`toggle-btn ${selectionMode ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    setSelectionMode(!selectionMode);
+                                                    if (selectionMode) {
+                                                        setSelectedStars(null);
+                                                        setSelectionCount(0);
+                                                    }
+                                                }}
+                                                title="Select stars to query in Query Builder"
+                                            >
+                                                <MapPin size={14} /> Select Region
+                                            </button>
+                                            <button
+                                                className={`toggle-btn compare ${compareMode ? 'active' : ''}`}
+                                                onClick={() => setCompareMode(!compareMode)}
+                                                title="Compare with ancient epoch (3000 BC)"
+                                            >
+                                                Compare
+                                            </button>
+                                            <button
+                                                className={`toggle-btn fullscreen ${isFullscreen ? 'active' : ''}`}
+                                                onClick={() => setIsFullscreen(!isFullscreen)}
+                                                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen study mode'}
+                                            >
+                                                {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                                            </button>
+                                            <button
+                                                className={`toggle-btn export ${isExporting ? 'loading' : ''}`}
+                                                onClick={() => handleExport('csv')}
+                                                disabled={isExporting || stars.length === 0}
+                                                title="Export current view as CSV"
+                                            >
+                                                {isExporting ? <RefreshCw size={14} className="spin" /> : <Download size={14} />}
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
 
 
-                                {isLoading && <span className="loading-indicator">Calculating positions...</span>}
-                                {!isLoading && <span className="star-count">{stats.totalStars} stars visible</span>}
+                                {!view3D && isLoading && <span className="loading-indicator">Calculating positions...</span>}
+                                {!view3D && !isLoading && <span className="star-count">{stats.totalStars} stars visible</span>}
                             </div>
                         </div>
 
@@ -905,6 +1305,463 @@ function TimeMachine() {
                                     <AlertCircle size={32} style={{ color: 'var(--accent-primary)' }} />
                                     <span>Error: {error}</span>
                                 </div>
+                            ) : view3D ? (
+                                <>
+                                    {/* 3D Celestial Sphere View */}
+                                    <CelestialSphere3D
+                                        stars={stars}
+                                        currentEpoch={currentEpoch}
+                                        showUncertainty={showUncertainty}
+                                        showGrid={true}
+                                        selectedStarId={selectedStarId}
+                                        onStarClick={(star) => {
+                                            setSelectedStarId(star.id);
+                                            // Navigate to star detail page
+                                            navigate(`/star/${star.id}`);
+                                        }}
+                                        showTrails={showTrails}
+                                        showVectors={showVectors}
+                                        isWarping={isWarping}
+                                        className="celestial-sphere-3d"
+                                    />
+                                    
+                                    {/* Stellarium-Style Interface */}
+                                    
+                                    {/* Top Control Bar - Stellarium Style */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '0',
+                                        left: '0',
+                                        right: '0',
+                                        height: '60px',
+                                        background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%)',
+                                        backdropFilter: 'blur(10px)',
+                                        borderBottom: '1px solid rgba(212, 104, 58, 0.2)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '0 1rem',
+                                        zIndex: 200
+                                    }}>
+                                        {/* Left Side - View Controls */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <span style={{ 
+                                                color: '#e8a87c', 
+                                                fontSize: '0.9rem', 
+                                                fontWeight: '600',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem'
+                                            }}>
+                                                <span>🌟</span>
+                                                {stats.totalStars} stars visible
+                                            </span>
+                                            
+                                            <div style={{ width: '1px', height: '30px', background: 'rgba(212, 104, 58, 0.3)' }} />
+                                            
+                                            {/* Magnitude Filter */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <span style={{ color: '#a89888', fontSize: '0.8rem' }}>Mag limit:</span>
+                                                <input
+                                                    type="range"
+                                                    min="6"
+                                                    max="15"
+                                                    step="0.5"
+                                                    defaultValue="12"
+                                                    style={{
+                                                        width: '80px',
+                                                        height: '3px',
+                                                        background: 'rgba(212, 104, 58, 0.3)',
+                                                        borderRadius: '2px',
+                                                        outline: 'none',
+                                                        cursor: 'pointer',
+                                                        WebkitAppearance: 'none'
+                                                    }}
+                                                />
+                                                <span style={{ color: '#d4683a', fontSize: '0.75rem', minWidth: '25px' }}>12.0</span>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Center - Main Time Display */}
+                                        <div style={{ flex: 1, textAlign: 'center' }}>
+                                            <div style={{ 
+                                                color: '#f8f5f0', 
+                                                fontSize: '1.1rem', 
+                                                fontWeight: '700',
+                                                fontFamily: 'Space Grotesk'
+                                            }}>
+                                                {currentEpoch < 0 
+                                                    ? `${Math.abs(currentEpoch).toLocaleString()} BC` 
+                                                    : `${currentEpoch.toLocaleString()} AD`
+                                                }
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Right Side - Display Options */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <button
+                                                onClick={() => setShowTrails(!showTrails)}
+                                                style={{
+                                                    background: showTrails ? 'rgba(212, 104, 58, 0.8)' : 'rgba(212, 104, 58, 0.2)',
+                                                    border: '1px solid rgba(212, 104, 58, 0.4)',
+                                                    borderRadius: '6px',
+                                                    padding: '0.4rem 0.6rem',
+                                                    color: showTrails ? 'white' : '#d4683a',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.3rem'
+                                                }}
+                                                title="Toggle Motion Trails"
+                                            >
+                                                <Layers size={14} />
+                                                Trails
+                                            </button>
+                                            
+                                            <button
+                                                onClick={() => setShowVectors(!showVectors)}
+                                                style={{
+                                                    background: showVectors ? 'rgba(212, 104, 58, 0.8)' : 'rgba(212, 104, 58, 0.2)',
+                                                    border: '1px solid rgba(212, 104, 58, 0.4)',
+                                                    borderRadius: '6px',
+                                                    padding: '0.4rem 0.6rem',
+                                                    color: showVectors ? 'white' : '#d4683a',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.3rem'
+                                                }}
+                                                title="Show Proper Motion Vectors"
+                                            >
+                                                <span>→</span>
+                                                Motion
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Bottom Control Bar - Timeline */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: '0',
+                                        left: '0',
+                                        right: '0',
+                                        height: '80px',
+                                        background: 'linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 100%)',
+                                        backdropFilter: 'blur(10px)',
+                                        borderTop: '1px solid rgba(212, 104, 58, 0.2)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'center',
+                                        padding: '0 2rem',
+                                        zIndex: 200
+                                    }}>
+                                        {/* Timeline Controls */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                                            {/* Play Controls */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <button
+                                                    onClick={() => setCurrentEpoch(currentEpoch - 1000)}
+                                                    style={{
+                                                        background: 'rgba(212, 104, 58, 0.2)',
+                                                        border: '1px solid rgba(212, 104, 58, 0.4)',
+                                                        borderRadius: '6px',
+                                                        width: '36px',
+                                                        height: '36px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                    title="Back 1000 years"
+                                                >
+                                                    <span style={{ color: '#d4683a', fontSize: '1.2rem' }}>⏮</span>
+                                                </button>
+                                                
+                                                <button
+                                                    onClick={() => setIsPlaying(!isPlaying)}
+                                                    style={{
+                                                        background: 'linear-gradient(135deg, #d4683a 0%, #e8a87c 100%)',
+                                                        border: 'none',
+                                                        borderRadius: '8px',
+                                                        width: '44px',
+                                                        height: '44px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease',
+                                                        boxShadow: '0 4px 12px rgba(212, 104, 58, 0.4)'
+                                                    }}
+                                                >
+                                                    {isPlaying ? <Pause size={20} color="white" fill="white" /> : <Play size={20} color="white" fill="white" />}
+                                                </button>
+                                                
+                                                <button
+                                                    onClick={() => setCurrentEpoch(currentEpoch + 1000)}
+                                                    style={{
+                                                        background: 'rgba(212, 104, 58, 0.2)',
+                                                        border: '1px solid rgba(212, 104, 58, 0.4)',
+                                                        borderRadius: '6px',
+                                                        width: '36px',
+                                                        height: '36px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                    title="Forward 1000 years"
+                                                >
+                                                    <span style={{ color: '#d4683a', fontSize: '1.2rem' }}>⏭</span>
+                                                </button>
+                                            </div>
+                                            
+                                            {/* Timeline Slider */}
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <input
+                                                    type="range"
+                                                    min="-10000"
+                                                    max="10000"
+                                                    step="10"
+                                                    value={currentEpoch}
+                                                    onChange={(e) => setCurrentEpoch(parseInt(e.target.value))}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '6px',
+                                                        background: 'linear-gradient(90deg, #d4683a 0%, #e8a87c 50%, #d4683a 100%)',
+                                                        borderRadius: '3px',
+                                                        outline: 'none',
+                                                        cursor: 'pointer',
+                                                        WebkitAppearance: 'none'
+                                                    }}
+                                                />
+                                                <div style={{ 
+                                                    display: 'flex', 
+                                                    justifyContent: 'space-between', 
+                                                    fontSize: '0.7rem', 
+                                                    color: '#a89888',
+                                                    marginTop: '0.25rem'
+                                                }}>
+                                                    <span>10,000 BC</span>
+                                                    <span>Present</span>
+                                                    <span>10,000 AD</span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Quick Jump */}
+                                            <button
+                                                onClick={() => setCurrentEpoch(2016)}
+                                                style={{
+                                                    background: 'rgba(232, 168, 124, 0.3)',
+                                                    border: '1px solid rgba(232, 168, 124, 0.4)',
+                                                    borderRadius: '6px',
+                                                    padding: '0.5rem 1rem',
+                                                    color: '#e8a87c',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                                title="Jump to present day (2016)"
+                                            >
+                                                Today
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Compact Filter Panel for 3D View */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: '1rem',
+                                        left: '1rem',
+                                        zIndex: 100,
+                                        transition: 'all 0.3s ease'
+                                    }}>
+                                        {/* Toggle Button */}
+                                        <button
+                                            onClick={() => setShowFilters(!showFilters)}
+                                            style={{
+                                                background: 'rgba(10, 10, 15, 0.9)',
+                                                backdropFilter: 'blur(12px)',
+                                                border: '1px solid rgba(212, 104, 58, 0.4)',
+                                                borderRadius: '8px',
+                                                padding: '0.5rem 0.75rem',
+                                                color: '#d4683a',
+                                                fontWeight: '600',
+                                                fontSize: '0.75rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.375rem',
+                                                transition: 'all 0.2s ease',
+                                                boxShadow: showFilters ? '0 0 15px rgba(212, 104, 58, 0.4)' : 'none',
+                                                marginBottom: showFilters ? '0.5rem' : '0'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.borderColor = '#d4683a';
+                                                e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 104, 58, 0.6)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.borderColor = 'rgba(212, 104, 58, 0.4)';
+                                                e.currentTarget.style.boxShadow = showFilters ? '0 0 15px rgba(212, 104, 58, 0.4)' : 'none';
+                                            }}
+                                        >
+                                            <Filter size={12} />
+                                            {showFilters ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                        </button>
+
+                                        {/* Compact Filter Panel */}
+                                        <div style={{
+                                            background: 'rgba(10, 10, 15, 0.95)',
+                                            backdropFilter: 'blur(16px)',
+                                            border: '1px solid rgba(212, 104, 58, 0.3)',
+                                            borderRadius: '10px',
+                                            padding: showFilters ? '0.75rem' : '0',
+                                            width: showFilters ? '200px' : '0',
+                                            maxHeight: showFilters ? '400px' : '0',
+                                            overflow: showFilters ? 'auto' : 'hidden',
+                                            opacity: showFilters ? 1 : 0,
+                                            transition: 'all 0.3s ease',
+                                            boxShadow: showFilters ? '0 4px 16px rgba(0, 0, 0, 0.7), 0 0 20px rgba(212, 104, 58, 0.2)' : 'none'
+                                        }}>
+                                            {/* Compact Controls */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                                                {/* Magnitude Slider */}
+                                                <div>
+                                                    <label style={{
+                                                        fontSize: '0.625rem',
+                                                        color: '#e8a87c',
+                                                        marginBottom: '0.25rem',
+                                                        display: 'block',
+                                                        fontWeight: '600'
+                                                    }}>Mag: {filters.maxMagnitude}</label>
+                                                    <input
+                                                        type="range"
+                                                        min="6"
+                                                        max="20"
+                                                        step="0.5"
+                                                        value={filters.maxMagnitude}
+                                                        onChange={(e) => setFilters({ ...filters, maxMagnitude: parseFloat(e.target.value) })}
+                                                        style={{
+                                                            width: '100%',
+                                                            height: '3px',
+                                                            background: 'linear-gradient(90deg, #d4683a 0%, #e8a87c 100%)',
+                                                            borderRadius: '2px',
+                                                            outline: 'none',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    />
+                                                </div>
+
+                                                {/* Star Limit Slider */}
+                                                <div>
+                                                    <label style={{
+                                                        fontSize: '0.625rem',
+                                                        color: '#e8a87c',
+                                                        marginBottom: '0.25rem',
+                                                        display: 'block',
+                                                        fontWeight: '600'
+                                                    }}>Stars: {filters.limit}</label>
+                                                    <input
+                                                        type="range"
+                                                        min="500"
+                                                        max="5000"
+                                                        step="500"
+                                                        value={filters.limit}
+                                                        onChange={(e) => setFilters({ ...filters, limit: parseInt(e.target.value) })}
+                                                        style={{
+                                                            width: '100%',
+                                                            height: '3px',
+                                                            background: 'linear-gradient(90deg, #d4683a 0%, #e8a87c 100%)',
+                                                            borderRadius: '2px',
+                                                            outline: 'none',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    />
+                                                </div>
+
+                                                {/* Quick Presets */}
+                                                <div style={{ paddingTop: '0.25rem', borderTop: '1px solid rgba(212, 104, 58, 0.2)' }}>
+                                                    <button
+                                                        onClick={() => {
+                                                            setFilters({
+                                                                raMin: 0,
+                                                                raMax: 180,
+                                                                decMin: -90,
+                                                                decMax: 90,
+                                                                maxMagnitude: 10,
+                                                                limit: 3000
+                                                            });
+                                                            setTimeout(() => fetchStarsAtEpoch(currentEpoch), 100);
+                                                        }}
+                                                        disabled={isLoading}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '0.375rem',
+                                                            background: isLoading ? 'rgba(212, 104, 58, 0.2)' : 'linear-gradient(135deg, #d4683a 0%, #e8a87c 100%)',
+                                                            border: 'none',
+                                                            borderRadius: '6px',
+                                                            color: 'white',
+                                                            fontSize: '0.625rem',
+                                                            fontWeight: '700',
+                                                            cursor: isLoading ? 'not-allowed' : 'pointer',
+                                                            marginBottom: '0.375rem',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                        onMouseEnter={(e) => !isLoading && (e.currentTarget.style.opacity = '0.9')}
+                                                        onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                                                    >
+                                                        {isLoading ? '...' : '180° Hemisphere'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setFilters({
+                                                                raMin: 0,
+                                                                raMax: 180,
+                                                                decMin: -90,
+                                                                decMax: 90,
+                                                                maxMagnitude: 9,
+                                                                limit: 5000
+                                                            });
+                                                            setTimeout(() => fetchStarsAtEpoch(currentEpoch), 100);
+                                                        }}
+                                                        disabled={isLoading}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '0.375rem',
+                                                            background: isLoading ? 'rgba(232, 168, 124, 0.2)' : 'rgba(232, 168, 124, 0.15)',
+                                                            border: '1px solid rgba(232, 168, 124, 0.4)',
+                                                            borderRadius: '6px',
+                                                            color: '#e8a87c',
+                                                            fontSize: '0.625rem',
+                                                            fontWeight: '700',
+                                                            cursor: isLoading ? 'not-allowed' : 'pointer',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!isLoading) {
+                                                                e.currentTarget.style.background = 'rgba(232, 168, 124, 0.25)';
+                                                                e.currentTarget.style.borderColor = '#e8a87c';
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.background = isLoading ? 'rgba(232, 168, 124, 0.2)' : 'rgba(232, 168, 124, 0.15)';
+                                                            e.currentTarget.style.borderColor = 'rgba(232, 168, 124, 0.4)';
+                                                        }}
+                                                    >
+                                                        Full Sky (180°×180°)
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
                             ) : (
                                 <div style={{ position: 'relative' }}>
                                     {/* Confidence Heatmap Background */}
@@ -930,280 +1787,24 @@ function TimeMachine() {
 
                                     {/* Star Map Plot */}
                                     <Plot
-                                        data={[
-                                            // Main stars trace
-                                            {
-                                                type: 'scatter',
-                                                mode: 'markers',
-                                                name: 'Stars',
-                                                x: stars.map(s => s.ra_at_epoch),
-                                                y: stars.map(s => s.dec_at_epoch),
-                                                marker: {
-                                                    size: stars.map(s => Math.max(2, 15 - s.brightness_mag)),
-                                                    color: stars.map(s =>
-                                                        s.uncertainty_class === 'high_confidence' ? '#4a9f6e' :
-                                                            s.uncertainty_class === 'acceptable' ? '#e8a87c' :
-                                                                s.uncertainty_class === 'approximate' ? '#f59e0b' :
-                                                                    '#ef4444'
-                                                    ),
-                                                    opacity: 0.8,
-                                                    line: { width: 0 }
-                                                },
-                                                text: stars.map(s =>
-                                                    `ID: ${s.id}<br>` +
-                                                    `RA: ${s.ra_at_epoch?.toFixed(4) || 'N/A'}°<br>` +
-                                                    `Dec: ${s.dec_at_epoch?.toFixed(4) || 'N/A'}°<br>` +
-                                                    `Mag: ${s.brightness_mag?.toFixed(2) || 'N/A'}<br>` +
-                                                    `PM: ${s.total_pm?.toFixed(2) || 'N/A'} mas/yr<br>` +
-                                                    `Uncertainty: ${s.uncertainty_arcsec?.toFixed(2) || 'N/A'}″`
-                                                ),
-                                                hovertemplate: '%{text}<extra></extra>'
-                                            },
-                                            // Highlight ring for selected star
-                                            ...(selectedStarId ? (() => {
-                                                // Try to find in loaded stars first
-                                                let selectedStar = stars.find(s => s.id === selectedStarId);
-
-                                                // If not found, try fast movers list
-                                                if (!selectedStar) {
-                                                    const fastMover = fastMoversList.find(s => s.id === selectedStarId);
-                                                    if (fastMover) {
-                                                        selectedStar = {
-                                                            ra_at_epoch: fastMover.ra_deg,
-                                                            dec_at_epoch: fastMover.dec_deg
-                                                        };
-                                                    }
-                                                }
-
-                                                if (selectedStar) {
-                                                    return [{
-                                                        type: 'scatter',
-                                                        mode: 'markers',
-                                                        name: 'Selected',
-                                                        x: [selectedStar.ra_at_epoch],
-                                                        y: [selectedStar.dec_at_epoch],
-                                                        marker: {
-                                                            size: 35,
-                                                            color: 'rgba(255, 215, 0, 0.3)',
-                                                            line: {
-                                                                color: '#ffd700',
-                                                                width: 3
-                                                            },
-                                                            symbol: 'circle-open'
-                                                        },
-                                                        hoverinfo: 'skip',
-                                                        showlegend: false
-                                                    }];
-                                                }
-                                                return [];
-                                            })() : []),
-
-                                            // Star trails - lines showing movement from 2016 to current epoch
-                                            ...(showTrails ? (() => {
-                                                // Only show trails for stars with PM data
-                                                const starsWithPM = stars.filter(s => s.pmra && s.pmdec);
-                                                const topMovers = starsWithPM
-                                                    .sort((a, b) => (b.total_pm || 0) - (a.total_pm || 0))
-                                                    .slice(0, 50); // Top 50 movers
-
-                                                return topMovers.map((s, idx) => ({
-                                                    type: 'scatter',
-                                                    mode: 'lines',
-                                                    x: [s.ra_deg, s.ra_at_epoch],
-                                                    y: [s.dec_deg, s.dec_at_epoch],
-                                                    line: {
-                                                        color: `rgba(212, 104, 58, ${0.6 - idx * 0.01})`,
-                                                        width: 1.5
-                                                    },
-                                                    hoverinfo: 'skip',
-                                                    showlegend: false
-                                                }));
-                                            })() : []),
-
-                                            // Movement vectors - arrows showing direction
-                                            ...(showVectors ? (() => {
-                                                const starsWithPM = stars.filter(s => s.pmra && s.pmdec && s.total_pm > 20);
-                                                const topMovers = starsWithPM.slice(0, 30);
-
-                                                return topMovers.map(s => {
-                                                    // Calculate arrow endpoint (exaggerated for visibility)
-                                                    const scale = 0.5; // Degrees per 1000 years approx
-                                                    const arrowEndRA = s.ra_at_epoch + (s.pmra / 3600000) * 1000 * scale;
-                                                    const arrowEndDec = s.dec_at_epoch + (s.pmdec / 3600000) * 1000 * scale;
-
-                                                    return {
-                                                        type: 'scatter',
-                                                        mode: 'lines+markers',
-                                                        x: [s.ra_at_epoch, arrowEndRA],
-                                                        y: [s.dec_at_epoch, arrowEndDec],
-                                                        line: { color: '#00bfff', width: 2 },
-                                                        marker: {
-                                                            size: [0, 8],
-                                                            color: '#00bfff',
-                                                            symbol: 'triangle-up'
-                                                        },
-                                                        hoverinfo: 'skip',
-                                                        showlegend: false
-                                                    };
-                                                });
-                                            })() : []),
-
-                                            // Comparison overlay - ancient epoch positions
-                                            ...(compareMode ? (() => {
-                                                // Calculate ancient positions (3000 BC)
-                                                const ancientStars = stars.filter(s => s.pmra && s.pmdec).map(s => {
-                                                    const yearsBack = currentEpoch - compareEpoch;
-                                                    const pmraPerYear = s.pmra / 3600000; // deg/yr
-                                                    const pmdecPerYear = s.pmdec / 3600000;
-                                                    const ancient_ra = s.ra_at_epoch - pmraPerYear * yearsBack;
-                                                    const ancient_dec = s.dec_at_epoch - pmdecPerYear * yearsBack;
-                                                    // Calculate distance moved
-                                                    const distance = Math.sqrt(
-                                                        Math.pow(s.ra_at_epoch - ancient_ra, 2) +
-                                                        Math.pow(s.dec_at_epoch - ancient_dec, 2)
-                                                    );
-                                                    return { ...s, ancient_ra, ancient_dec, distance };
-                                                });
-
-                                                // Only show top 20 with significant movement
-                                                const topMovers = ancientStars
-                                                    .filter(s => s.distance > 0.01) // Minimum visible movement
-                                                    .sort((a, b) => b.distance - a.distance)
-                                                    .slice(0, 20);
-
-                                                // Color gradient based on rank
-                                                const colors = topMovers.map((_, i) =>
-                                                    `hsl(${35 + i * 5}, 100%, ${70 - i * 2}%)`
-                                                );
-
-                                                return [
-                                                    // Ancient positions (amber markers with size based on rank)
-                                                    {
-                                                        type: 'scatter',
-                                                        mode: 'markers+text',
-                                                        name: `${Math.abs(compareEpoch)} ${compareEpoch < 0 ? 'BC' : 'AD'}`,
-                                                        x: topMovers.map(s => s.ancient_ra),
-                                                        y: topMovers.map(s => s.ancient_dec),
-                                                        text: topMovers.map((_, i) => `${i + 1}`),
-                                                        textposition: 'top center',
-                                                        textfont: { size: 9, color: '#fff' },
-                                                        marker: {
-                                                            size: topMovers.map((_, i) => 18 - i * 0.5),
-                                                            color: colors,
-                                                            line: { color: '#fff', width: 1.5 },
-                                                            symbol: 'diamond'
-                                                        },
-                                                        hovertemplate: '<b>Ancient Position</b><br>RA: %{x:.4f}°<br>Dec: %{y:.4f}°<extra></extra>'
-                                                    },
-                                                    // Gradient connecting lines
-                                                    ...topMovers.map((s, i) => ({
-                                                        type: 'scatter',
-                                                        mode: 'lines',
-                                                        x: [s.ancient_ra, s.ra_at_epoch],
-                                                        y: [s.ancient_dec, s.dec_at_epoch],
-
-                                                        line: {
-                                                            color: colors[i],
-                                                            width: Math.max(1.5, 3 - i * 0.1)
-                                                        },
-                                                        hoverinfo: 'skip',
-                                                        showlegend: false
-                                                    }))
-                                                ];
-                                            })() : []),
-
-                                            // Uncertainty visualization - semi-transparent circles showing prediction confidence
-                                            ...(showUncertainty ? (() => {
-                                                try {
-                                                    // Get uncertainty color based on class
-                                                    const getUncertaintyColor = (uncertaintyClass) => {
-                                                        const colors = {
-                                                            'high_confidence': 'rgba(0, 255, 136, 0.15)',
-                                                            'acceptable': 'rgba(255, 235, 59, 0.15)',
-                                                            'approximate': 'rgba(255, 152, 0, 0.2)',
-                                                            'extreme_range': 'rgba(244, 67, 54, 0.25)',
-                                                            'unreliable': 'rgba(183, 28, 28, 0.3)'
-                                                        };
-                                                        return colors[uncertaintyClass] || 'rgba(150, 150, 150, 0.15)';
-                                                    };
-
-                                                    // Filter stars with valid uncertainty data
-                                                    const starsWithUncertainty = stars.filter(s =>
-                                                        s.uncertainty_deg !== undefined &&
-                                                        s.uncertainty_deg !== null &&
-                                                        s.uncertainty_arcsec !== undefined &&
-                                                        s.uncertainty_arcsec < 999999 &&
-                                                        s.ra_at_epoch !== undefined &&
-                                                        s.dec_at_epoch !== undefined &&
-                                                        !isNaN(s.uncertainty_deg)
-                                                    );
-
-                                                    // Limit to 50 stars to prevent performance issues
-                                                    const limitedStars = starsWithUncertainty.slice(0, 50);
-
-                                                    // Create circle traces for each star
-                                                    return limitedStars.map((star, idx) => {
-                                                        // Calculate circle size (convert degrees to plot units)
-                                                        // Scale factor to make circles visible but not overwhelming
-                                                        const radius = Math.max(0.01, star.uncertainty_deg * 2); // Ensure minimum radius
-
-                                                        // Create circle points (approximation with 20 points for performance)
-                                                        const numPoints = 20;
-                                                        const angles = Array.from({ length: numPoints + 1 }, (_, i) => (i / numPoints) * 2 * Math.PI);
-                                                        const circleX = angles.map(a => star.ra_at_epoch + radius * Math.cos(a));
-                                                        const circleY = angles.map(a => star.dec_at_epoch + radius * Math.sin(a));
-
-                                                        return {
-                                                            type: 'scatter',
-                                                            mode: 'lines',
-                                                            x: circleX,
-                                                            y: circleY,
-                                                            fill: 'toself',
-                                                            fillcolor: getUncertaintyColor(star.uncertainty_class),
-                                                            line: {
-                                                                color: getUncertaintyColor(star.uncertainty_class).replace('0.15', '0.4').replace('0.2', '0.5').replace('0.25', '0.6').replace('0.3', '0.7'),
-                                                                width: 1
-                                                            },
-                                                            hoverinfo: 'skip',
-                                                            showlegend: false,
-                                                            name: `Uncertainty ${idx}`
-                                                        };
-                                                    });
-                                                } catch (error) {
-                                                    console.error('Error rendering uncertainty circles:', error);
-                                                    return []; // Return empty array on error to prevent graph crash
-                                                }
-                                            })() : [])
-
-                                        ]}
-
-
-                                        layout={{
-                                            title: null,
-                                            xaxis: {
-                                                title: 'Right Ascension (°)',
-                                                gridcolor: 'rgba(255, 255, 255, 0.1)',
-                                                color: '#888888',
-                                                autorange: 'reversed'
-                                            },
-                                            yaxis: {
-                                                title: 'Declination (°)',
-                                                gridcolor: 'rgba(255, 255, 255, 0.1)',
-                                                color: '#888888'
-                                            },
-                                            paper_bgcolor: 'transparent',
-                                            plot_bgcolor: 'rgba(15, 15, 15, 0.5)',
-                                            font: { family: 'Inter, sans-serif', color: '#e5e5e5' },
-                                            margin: { l: 60, r: 20, t: 20, b: 60 },
-                                            hovermode: 'closest',
-                                            dragmode: selectionMode ? 'select' : 'pan' // Enable box select when selection mode is on
-                                        }}
+                                        data={plotData}
+                                        layout={plotLayout}
                                         config={{
                                             displayModeBar: true,
                                             displaylogo: false,
                                             responsive: true
                                         }}
                                         onSelected={handleStarSelection}
+                                        onClick={(data) => {
+                                            // Handle single star click to navigate to detail page
+                                            if (data.points && data.points.length === 1) {
+                                                const point = data.points[0];
+                                                const starId = point.customdata;
+                                                if (starId) {
+                                                    navigate(`/star/${starId}`);
+                                                }
+                                            }
+                                        }}
                                         style={{ width: '100%', height: '100%' }}
                                     />
                                 </div>
@@ -1376,6 +1977,7 @@ function TimeMachine() {
                     )}
 
                     {/* Timeline Controller Footer */}
+                    {!view3D && (
                     <div className="timeline-footer">
                         {/* Animation Control Panel */}
                         <div className="animation-controls">
@@ -1450,6 +2052,7 @@ function TimeMachine() {
                             onPlayPauseToggle={() => setIsPlaying(!isPlaying)}
                         />
                     </div>
+                    )}
                 </main>
             </div>
         </>

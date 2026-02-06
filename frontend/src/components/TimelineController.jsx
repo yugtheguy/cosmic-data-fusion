@@ -23,6 +23,7 @@ const TimelineController = ({
     const [playbackSpeed, setPlaybackSpeed] = useState(1); // 1x, 2x, 5x, 10x
     const animationRef = useRef(null);
     const lastUpdateRef = useRef(Date.now());
+    const localEpochRef = useRef(currentEpoch);
 
     // Preset epoch bookmarks
     const bookmarks = [
@@ -54,61 +55,73 @@ const TimelineController = ({
         return { class: 'unreliable', label: 'Unreliable', color: '#dc2626' };
     };
 
+    // Keep local epoch in sync when external epoch changes (e.g., slider or parent updates)
+    useEffect(() => {
+        if (!isPlaying) {
+            setLocalEpoch(currentEpoch);
+            localEpochRef.current = currentEpoch;
+        }
+    }, [currentEpoch, isPlaying]);
+
     // Animation loop for playback
     useEffect(() => {
-        if (isPlaying) {
-            let frameCount = 0;
-            const EPOCH_UPDATE_INTERVAL = 10; // Only update epoch every 10 frames (~6 times per second)
+        if (!isPlaying) {
+            return undefined;
+        }
 
-            const animate = () => {
-                const now = Date.now();
-                const deltaTime = (now - lastUpdateRef.current) / 1000; // seconds
-                lastUpdateRef.current = now;
+        let frameCount = 0;
+        const EPOCH_UPDATE_INTERVAL = 10; // Only update epoch every 10 frames (~6 times per second)
 
-                // Years per second (100 years/sec at 1x speed)
-                const yearsPerSecond = 100 * playbackSpeed;
-                const newEpoch = localEpoch + (yearsPerSecond * deltaTime);
+        const animate = () => {
+            const now = Date.now();
+            const deltaTime = (now - lastUpdateRef.current) / 1000; // seconds
+            lastUpdateRef.current = now;
 
-                // Wrap around or stop at boundaries
-                if (newEpoch > maxEpoch) {
-                    setLocalEpoch(minEpoch); // Loop back
-                    onEpochChange(minEpoch); // Always update on loop
-                } else {
-                    setLocalEpoch(newEpoch);
+            // Years per second (100 years/sec at 1x speed)
+            const yearsPerSecond = 100 * playbackSpeed;
+            let newEpoch = localEpochRef.current + (yearsPerSecond * deltaTime);
 
-                    // Throttle epoch change callbacks to reduce API calls
-                    frameCount++;
-                    if (frameCount >= EPOCH_UPDATE_INTERVAL) {
-                        onEpochChange(newEpoch);
-                        frameCount = 0;
-                    }
-                }
+            // Wrap around or stop at boundaries
+            if (newEpoch > maxEpoch) {
+                newEpoch = minEpoch; // Loop back
+            }
 
-                animationRef.current = requestAnimationFrame(animate);
-            };
+            localEpochRef.current = newEpoch;
+            setLocalEpoch(newEpoch);
+
+            // Throttle epoch change callbacks to reduce API calls
+            frameCount++;
+            if (frameCount >= EPOCH_UPDATE_INTERVAL) {
+                onEpochChange(newEpoch);
+                frameCount = 0;
+            }
 
             animationRef.current = requestAnimationFrame(animate);
+        };
 
-            return () => {
-                if (animationRef.current) {
-                    cancelAnimationFrame(animationRef.current);
-                    // Ensure final epoch is set when animation stops
-                    onEpochChange(localEpoch);
-                }
-            };
-        }
-    }, [isPlaying, localEpoch, playbackSpeed, minEpoch, maxEpoch, onEpochChange]);
+        animationRef.current = requestAnimationFrame(animate);
+
+        return () => {
+            if (animationRef.current) {
+                cancelAnimationFrame(animationRef.current);
+            }
+            // Ensure final epoch is set when animation stops
+            onEpochChange(localEpochRef.current);
+        };
+    }, [isPlaying, playbackSpeed, minEpoch, maxEpoch, onEpochChange]);
 
     // Handle slider change
     const handleSliderChange = (e) => {
         const newEpoch = parseFloat(e.target.value);
         setLocalEpoch(newEpoch);
+        localEpochRef.current = newEpoch;
         onEpochChange(newEpoch);
     };
 
     // Jump to bookmark
     const jumpToEpoch = (epoch) => {
         setLocalEpoch(epoch);
+        localEpochRef.current = epoch;
         onEpochChange(epoch);
     };
 
@@ -116,12 +129,14 @@ const TimelineController = ({
     const stepBackward = () => {
         const newEpoch = Math.max(minEpoch, localEpoch - 100);
         setLocalEpoch(newEpoch);
+        localEpochRef.current = newEpoch;
         onEpochChange(newEpoch);
     };
 
     const stepForward = () => {
         const newEpoch = Math.min(maxEpoch, localEpoch + 100);
         setLocalEpoch(newEpoch);
+        localEpochRef.current = newEpoch;
         onEpochChange(newEpoch);
     };
 

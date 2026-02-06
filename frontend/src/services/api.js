@@ -16,10 +16,42 @@ api.interceptors.request.use(
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+        } else {
+            console.warn('No authentication token found - API call may fail for protected endpoints');
         }
         return config;
     },
     (error) => {
+        return Promise.reject(error);
+    }
+);
+
+// Add a response interceptor to handle common errors
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            console.warn('Authentication required for:', error.config.url);
+            
+            // For development: return mock data for certain endpoints to prevent console spam
+            if (error.config.url?.includes('/datasets') && error.config.method === 'get') {
+                console.log('Returning mock dataset data for development');
+                return Promise.resolve({
+                    data: {
+                        datasets: [],
+                        message: 'No datasets available - demo mode'
+                    }
+                });
+            }
+            
+            // Clear invalid token
+            localStorage.removeItem('token');
+            // You could dispatch a logout action here
+            if (window.location.pathname !== '/login') {
+                console.log('Authentication required - would redirect to login in production');
+                // window.location.href = '/login';
+            }
+        }
         return Promise.reject(error);
     }
 );

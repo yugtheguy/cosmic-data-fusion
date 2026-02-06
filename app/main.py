@@ -88,13 +88,20 @@ with automatic coordinate standardization to ICRS J2000.
     redoc_url="/redoc",
 )
 
-# Configure CORS
+# Configure CORS - Allow frontend origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Explicit origins for better security/CORS support
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # Alternative dev server
+        "http://127.0.0.1:5173",  # Localhost alias
+        "http://127.0.0.1:3000",   # Localhost alias
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Register API routers
