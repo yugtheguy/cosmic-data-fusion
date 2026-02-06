@@ -45,6 +45,7 @@ import SchemaMapper from '../components/SchemaMapper';
 import AILab from '../components/AILab';
 import Harmonizer from '../components/Harmonizer';
 import ResultsTable from '../components/ResultsTable';
+import CoordinateResolver from '../components/CoordinateResolver';
 import './Dashboard.css';
 
 // Sidebar Navigation Component
@@ -52,6 +53,7 @@ function Sidebar({ activeTab, setActiveTab, filters, setFilters, onResetFilters,
     const navigate = useNavigate();
     const navItems = [
         { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+        { id: 'coordinate-resolver', icon: Target, label: 'Coordinate Finder' },
         { id: 'timemachine', icon: Clock, label: 'Time Machine', link: '/timemachine' },
         { id: 'query', icon: Search, label: 'Query Builder' },
         { id: 'results', icon: Database, label: 'Data Table' },
@@ -1469,6 +1471,8 @@ function Dashboard() {
                     </div>
                 ) : activeTab === 'upload' ? (
                     <UploadView setActiveTab={setActiveTab} onUploadSuccess={handleUploadSuccess} />
+                ) : activeTab === 'coordinate-resolver' ? (
+                    <CoordinateResolver />
                 ) : activeTab === 'anomaly' ? (
                     <AILab />
                 ) : activeTab === 'harmonize' ? (
