@@ -5,6 +5,7 @@ import { DataCacheProvider } from './contexts/DataCacheContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
+import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
 import StarDetailPage from './pages/StarDetailPage';
 import PlanetHunter from './pages/PlanetHunter';
@@ -13,67 +14,84 @@ import QueryBuilder from './pages/QueryBuilder';
 import ResearchMethodology from './pages/ResearchMethodology';
 import CosmicChat from './components/CosmicChat';
 import AIResearchAssistant from './components/AIResearchAssistant';
+import SkyMapPage from './pages/SkyMapPage';
+import DataIngestionPage from './pages/DataIngestionPage';
+import ResultsPage from './pages/ResultsPage';
+import CoordinateResolver from './components/CoordinateResolver';
+import HarmonizerPage from './pages/HarmonizerPage';
+import AILab from './components/AILab';
 
 function App() {
     return (
         <AuthProvider>
             <DataCacheProvider>
                 <Router>
-                <Routes>
-                    <Route path="/" element={<LandingPage />} />
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/signup" element={<SignUpPage />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/timemachine" element={<TimeMachine />} />
-                    <Route path="/query" element={<QueryBuilder />} />
-                    <Route path="/planet-hunter" element={<PlanetHunter />} />
-                    <Route path="/star/:id" element={<StarDetailPage />} />
-                    <Route path="/research-methodology" element={<ResearchMethodology />} />
-                    <Route path="/ai-assistant" element={<AIResearchAssistant />} />
-                </Routes>
-                {/* Site-wide AI Chat Widget */}
-                <CosmicChat />
-            </Router>
-            <Toaster
-                position="top-right"
-                toastOptions={{
-                    duration: 4000,
-                    style: {
-                        background: 'rgba(26, 26, 26, 0.95)',
-                        color: '#e5e5e5',
-                        border: '1px solid #2a2a2a',
-                        backdropFilter: 'blur(12px)',
-                        borderRadius: '12px',
-                        padding: '12px 16px',
-                        fontSize: '0.9rem',
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                    },
-                    success: {
-                        iconTheme: {
-                            primary: '#e8a87c',
-                            secondary: '#1a1a1a',
-                        },
+                    <Routes>
+                        <Route path="/" element={<LandingPage />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/signup" element={<SignUpPage />} />
+                        <Route path="/oauth/callback" element={<AuthCallback />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/timemachine" element={<TimeMachine />} />
+                        <Route path="/query" element={<QueryBuilder />} />
+                        <Route path="/planet-hunter" element={<PlanetHunter />} />
+                        <Route path="/star/:id" element={<StarDetailPage />} />
+                        <Route path="/research-methodology" element={<ResearchMethodology />} />
+
+                        <Route path="/ai-assistant" element={<AIResearchAssistant />} />
+
+                        {/* Feature Pages */}
+                        <Route path="/skymap" element={<SkyMapPage />} />
+                        <Route path="/upload" element={<DataIngestionPage />} />
+                        <Route path="/results" element={<ResultsPage />} />
+                        <Route path="/coordinate-resolver" element={<CoordinateResolver />} />
+                        <Route path="/harmonizer" element={<HarmonizerPage />} />
+                        {/* AILab is a component but properly includes Sidebar */}
+                        <Route path="/ai-lab" element={<AILab />} />
+                    </Routes>
+                    {/* Site-wide AI Chat Widget */}
+                    <CosmicChat />
+                </Router>
+                <Toaster
+                    position="top-right"
+                    toastOptions={{
+                        duration: 4000,
                         style: {
-                            borderColor: 'rgba(232, 168, 124, 0.3)',
+                            background: 'rgba(26, 26, 26, 0.95)',
+                            color: '#e5e5e5',
+                            border: '1px solid #2a2a2a',
+                            backdropFilter: 'blur(12px)',
+                            borderRadius: '12px',
+                            padding: '12px 16px',
+                            fontSize: '0.9rem',
+                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
                         },
-                    },
-                    error: {
-                        iconTheme: {
-                            primary: '#ef4444',
-                            secondary: '#1a1a1a',
+                        success: {
+                            iconTheme: {
+                                primary: '#e8a87c',
+                                secondary: '#1a1a1a',
+                            },
+                            style: {
+                                borderColor: 'rgba(232, 168, 124, 0.3)',
+                            },
                         },
-                        style: {
-                            borderColor: 'rgba(239, 68, 68, 0.3)',
+                        error: {
+                            iconTheme: {
+                                primary: '#ef4444',
+                                secondary: '#1a1a1a',
+                            },
+                            style: {
+                                borderColor: 'rgba(239, 68, 68, 0.3)',
+                            },
                         },
-                    },
-                    loading: {
-                        iconTheme: {
-                            primary: '#d4683a',
-                            secondary: '#1a1a1a',
+                        loading: {
+                            iconTheme: {
+                                primary: '#d4683a',
+                                secondary: '#1a1a1a',
+                            },
                         },
-                    },
-                }}
-            />
+                    }}
+                />
             </DataCacheProvider>
         </AuthProvider>
     );

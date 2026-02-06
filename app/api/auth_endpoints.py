@@ -7,13 +7,16 @@ with JWT token-based authentication.
 
 from datetime import timedelta
 from typing import List
+import os
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
+from app.oauth import oauth
 from app.auth import (
     get_password_hash,
     authenticate_user,
@@ -286,3 +289,96 @@ async def delete_user(
     db.commit()
     
     return {"message": f"User {user.email} deactivated successfully"}
+
+
+# =============================================================================
+# Google OAuth Endpoints
+# =============================================================================
+
+@router.get("/google/login")
+async def google_login(request: Request):
+    """
+    Initiate Google OAuth login flow.
+    
+    Redirects user to Google's consent screen.
+    
+    Args:
+        request: FastAPI request object
+        
+    Returns:
+        Redirect to Google OAuth consent screen
+    """
+    # Use url_for to get the absolute callback URL
+    redirect_uri = str(request.url_for('google_callback'))
+    
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    """
+    Handle Google OAuth callback.
+    
+    Exchanges authorization code for user info, creates/updates user,
+    and redirects to frontend with JWT token.
+    
+    Args:
+        request: FastAPI request object containing auth code
+        db: Database session
+        
+    Returns:
+        Redirect to frontend with JWT token in URL
+    """
+    try:
+        # Get access token from Google
+        token = await oauth.google.authorize_access_token(request)
+        
+        # Get user info from Google
+        user_info = token.get('userinfo')
+        if not user_info:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to get user info from Google"
+            )
+        
+        email = user_info.get('email')
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email not provided by Google"
+            )
+        
+        # Check if user exists
+        user = db.query(User).filter(User.email == email).first()
+        
+        if not user:
+            # Create new user
+            user = User(
+                email=email,
+                full_name=user_info.get('name', email.split('@')[0]),
+                hashed_password=get_password_hash(os.urandom(32).hex()),  # Random password
+                is_active=True,
+                is_superuser=False
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        
+        # Generate JWT token
+        access_token = create_access_token(
+            data={"sub": user.email},
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+        
+        # Redirect to frontend with token
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+        return RedirectResponse(
+            url=f"{frontend_url}/oauth/callback?token={access_token}"
+        )
+        
+    except Exception as e:
+        # Redirect to frontend with error
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+        return RedirectResponse(
+            url=f"{frontend_url}/oauth/callback?error={str(e)}"
+        )

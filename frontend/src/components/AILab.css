@@ -1,4 +1,18 @@
 /* AI Lab Styles */
+.ai-lab-page-container {
+    display: flex;
+    min-height: 100vh;
+    background: #0f0f0f;
+    /* Match dashboard/deep space bg */
+}
+
+.ai-lab-content-wrapper {
+    flex: 1;
+    margin-left: 280px;
+    /* Sidebar width */
+    width: 100%;
+}
+
 .ai-lab {
     padding: 1.5rem;
     max-width: 1200px;
@@ -116,6 +130,7 @@
         opacity: 0;
         transform: translateY(-10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);

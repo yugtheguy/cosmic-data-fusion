@@ -11,17 +11,21 @@ Run with: uvicorn app.main:app --reload
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.database import init_db
-from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors, analytics, temporal, natural_query, auth_endpoints
+from app.api import ingest, search, health, datasets, visualize, ai, query, harmonize, schema_mapper, errors, analytics, temporal, natural_query, auth_endpoints, analysis
+from app.oauth import oauth
 
 # Configure logging
+log_level = os.getenv("LOG_LEVEL", "INFO")
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -88,13 +92,31 @@ with automatic coordinate standardization to ICRS J2000.
     redoc_url="/redoc",
 )
 
-# Configure CORS
+# Configure CORS - environment-based
+# In production, set ALLOWED_ORIGINS environment variable to your frontend domain(s)
+# Example: ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env:
+    # Production: use specified origins
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",")]
+    logger.info(f"CORS configured for origins: {allowed_origins}")
+else:
+    # Development: allow all origins
+    allowed_origins = ["*"]
+    logger.warning("CORS configured to allow all origins (development mode)")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Add session middleware for OAuth (required by authlib)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SECRET_KEY", "dev_secret_key_change_in_production")
 )
 
 # Register API routers
@@ -111,6 +133,7 @@ app.include_router(schema_mapper.router)  # Schema Mapper endpoints
 app.include_router(errors.router)  # Error Reporting endpoints (Layer 1)
 app.include_router(temporal.router)  # Time Machine endpoints (Phase 6)
 app.include_router(natural_query.router)  # Natural Language Query endpoints
+app.include_router(analysis.router)  # Exoplanet Analysis endpoints (Planet Hunter)
 app.include_router(health.router)
 
 

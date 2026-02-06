@@ -1,8 +1,19 @@
 /* Research Methodology Page Styles */
-.research-methodology-page {
+.research-methodology-page-container {
+    display: flex;
     min-height: 100vh;
     background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
     color: #e5e5e5;
+}
+
+.research-methodology-content-wrapper {
+    flex: 1;
+    margin-left: 280px;
+    width: 100%;
+}
+
+.research-methodology-page {
+    /* Background moved into container for full coverage */
 }
 
 /* Header */
@@ -362,6 +373,11 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    .research-methodology-content-wrapper {
+        margin-left: 0;
+    }
+
+
     .research-header h1 {
         font-size: 2rem;
     }

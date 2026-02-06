@@ -1,8 +1,16 @@
 /* Planet Hunter Page Styles */
 .planet-hunter-page {
+    display: flex;
     min-height: 100vh;
-    background: linear-gradient(135deg, #0f0c1d 0%, #1a1528 100%);
+    /* Background removed to allow global dynamic background to show through */
+    padding: 0;
+}
+
+.planet-hunter-content-wrapper {
+    flex: 1;
+    margin-left: 280px;
     padding: 2rem;
+    width: 100%;
 }
 
 /* Header */
@@ -80,11 +88,13 @@
 .plot-card,
 .error-card,
 .no-data-card {
-    background: rgba(26, 26, 26, 0.95);
-    border: 1px solid #2a2a2a;
+    background: rgba(30, 28, 24, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     padding: 1.5rem;
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
@@ -123,8 +133,8 @@
 
 .tic-input {
     padding: 0.875rem 1rem;
-    background: rgba(42, 42, 42, 0.6);
-    border: 1px solid #2a2a2a;
+    background: rgba(42, 42, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     color: #e5e5e5;
     font-size: 1rem;
@@ -134,7 +144,7 @@
 .tic-input:focus {
     outline: none;
     border-color: #e8a87c;
-    background: rgba(42, 42, 42, 0.8);
+    background: rgba(42, 42, 42, 0.7);
     box-shadow: 0 0 0 3px rgba(232, 168, 124, 0.1);
 }
 
@@ -196,8 +206,13 @@
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Info Box */
@@ -384,6 +399,11 @@
 /* Responsive Design */
 @media (max-width: 768px) {
     .planet-hunter-page {
+        padding: 0;
+    }
+
+    .planet-hunter-content-wrapper {
+        margin-left: 0;
         padding: 1rem;
     }
 

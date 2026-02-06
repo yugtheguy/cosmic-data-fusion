@@ -17,6 +17,7 @@ import {
 import Plot from 'react-plotly.js';
 import { detectAnomalies, findClusters } from '../services/api';
 import toast from 'react-hot-toast';
+import Sidebar from './Sidebar';
 import './AILab.css';
 
 function AILab() {
@@ -212,274 +213,279 @@ function AILab() {
     };
 
     return (
-        <div className="ai-lab">
-            <div className="ai-lab-header">
-                <div className="header-title">
-                    <Brain size={28} className="brain-icon" />
-                    <h2>AI Discovery Lab</h2>
-                </div>
-                <p>Unlock hidden patterns in your stellar data using machine learning</p>
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="ai-tabs">
-                <button
-                    className={`ai-tab ${activeTab === 'clusters' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('clusters')}
-                >
-                    <Target size={18} />
-                    Cluster Analysis
-                </button>
-                <button
-                    className={`ai-tab ${activeTab === 'anomalies' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('anomalies')}
-                >
-                    <Sparkles size={18} />
-                    Anomaly Detection
-                </button>
-            </div>
-
-            {/* Error Banner */}
-            {error && (
-                <div className="error-banner">
-                    <AlertTriangle size={18} />
-                    <span>{error}</span>
-                </div>
-            )}
-
-            {/* Cluster Analysis Tab */}
-            {activeTab === 'clusters' && (
-                <div className="ai-panel">
-                    <div className="controls-row">
-                        <div className="control-group">
-                            <label>Epsilon (Distance)</label>
-                            <input
-                                type="range"
-                                min="0.1"
-                                max="2.0"
-                                step="0.1"
-                                value={clusterParams.eps}
-                                onChange={(e) => setClusterParams(p => ({ ...p, eps: parseFloat(e.target.value) }))}
-                            />
-                            <span className="value-display">{clusterParams.eps.toFixed(1)}</span>
+        <div className="ai-lab-page-container">
+            <Sidebar activeTab="anomaly" />
+            <div className="ai-lab-content-wrapper">
+                <div className="ai-lab">
+                    <div className="ai-lab-header">
+                        <div className="header-title">
+                            <Brain size={28} className="brain-icon" />
+                            <h2>AI Discovery Lab</h2>
                         </div>
-                        <div className="control-group">
-                            <label>Min Samples</label>
-                            <input
-                                type="range"
-                                min="3"
-                                max="50"
-                                step="1"
-                                value={clusterParams.minSamples}
-                                onChange={(e) => setClusterParams(p => ({ ...p, minSamples: parseInt(e.target.value) }))}
-                            />
-                            <span className="value-display">{clusterParams.minSamples}</span>
-                        </div>
-                        <button className="run-btn" onClick={runClustering} disabled={loading}>
-                            {loading ? <Loader2 size={18} className="spin" /> : <Zap size={18} />}
-                            {loading ? 'Running...' : 'Run DBSCAN'}
+                        <p>Unlock hidden patterns in your stellar data using machine learning</p>
+                    </div>
+
+                    {/* Tab Navigation */}
+                    <div className="ai-tabs">
+                        <button
+                            className={`ai-tab ${activeTab === 'clusters' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('clusters')}
+                        >
+                            <Target size={18} />
+                            Cluster Analysis
+                        </button>
+                        <button
+                            className={`ai-tab ${activeTab === 'anomalies' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('anomalies')}
+                        >
+                            <Sparkles size={18} />
+                            Anomaly Detection
                         </button>
                     </div>
 
-                    {clusterResult && (
-                        <div className="cluster-content-grid">
-                            <div className="cluster-viz">
-                                <div className="result-stats">
-                                    <div className="stat-card">
-                                        <span className="stat-value">{clusterResult.n_clusters}</span>
-                                        <span className="stat-label">Clusters Found</span>
-                                    </div>
-                                    <div className="stat-card">
-                                        <span className="stat-value">{clusterResult.total_stars - clusterResult.n_noise}</span>
-                                        <span className="stat-label">Grouped Stars</span>
-                                    </div>
-                                    <div className="stat-card">
-                                        <span className="stat-value">{clusterResult.n_noise}</span>
-                                        <span className="stat-label">Noise Points</span>
-                                    </div>
-                                </div>
+                    {/* Error Banner */}
+                    {error && (
+                        <div className="error-banner">
+                            <AlertTriangle size={18} />
+                            <span>{error}</span>
+                        </div>
+                    )}
 
-                                {/* Phase 4: Analysis Note (Soft Warning) */}
-                                {clusterResult.analysis_note && (
-                                    <div className="analysis-note-banner">
-                                        <AlertCircle size={18} />
-                                        <span>{clusterResult.analysis_note}</span>
-                                    </div>
-                                )}
-
-                                <div className="plot-container">
-                                    <Plot
-                                        data={getClusterPlotData()}
-                                        layout={{ ...plotLayout, title: 'Star Clusters (DBSCAN)' }}
-                                        config={{ responsive: true, displayModeBar: false }}
-                                        style={{ width: '100%', height: '400px' }}
-                                        onClick={handlePlotClick}
+                    {/* Cluster Analysis Tab */}
+                    {activeTab === 'clusters' && (
+                        <div className="ai-panel">
+                            <div className="controls-row">
+                                <div className="control-group">
+                                    <label>Epsilon (Distance)</label>
+                                    <input
+                                        type="range"
+                                        min="0.1"
+                                        max="2.0"
+                                        step="0.1"
+                                        value={clusterParams.eps}
+                                        onChange={(e) => setClusterParams(p => ({ ...p, eps: parseFloat(e.target.value) }))}
                                     />
+                                    <span className="value-display">{clusterParams.eps.toFixed(1)}</span>
                                 </div>
+                                <div className="control-group">
+                                    <label>Min Samples</label>
+                                    <input
+                                        type="range"
+                                        min="3"
+                                        max="50"
+                                        step="1"
+                                        value={clusterParams.minSamples}
+                                        onChange={(e) => setClusterParams(p => ({ ...p, minSamples: parseInt(e.target.value) }))}
+                                    />
+                                    <span className="value-display">{clusterParams.minSamples}</span>
+                                </div>
+                                <button className="run-btn" onClick={runClustering} disabled={loading}>
+                                    {loading ? <Loader2 size={18} className="spin" /> : <Zap size={18} />}
+                                    {loading ? 'Running...' : 'Run DBSCAN'}
+                                </button>
                             </div>
 
-                            {/* Cluster List / Explorer */}
-                            <div className="cluster-explorer">
-                                <h3>Defined Clusters</h3>
-                                <div className="cluster-list">
-                                    {Object.keys(clusterResult.clusters)
-                                        .filter(name => name !== 'noise')
-                                        .map(clusterName => {
-                                            const stats = clusterResult.cluster_stats[clusterName];
-                                            const isExpanded = expandedCluster === clusterName;
-                                            const members = clusterResult.clusters[clusterName];
+                            {clusterResult && (
+                                <div className="cluster-content-grid">
+                                    <div className="cluster-viz">
+                                        <div className="result-stats">
+                                            <div className="stat-card">
+                                                <span className="stat-value">{clusterResult.n_clusters}</span>
+                                                <span className="stat-label">Clusters Found</span>
+                                            </div>
+                                            <div className="stat-card">
+                                                <span className="stat-value">{clusterResult.total_stars - clusterResult.n_noise}</span>
+                                                <span className="stat-label">Grouped Stars</span>
+                                            </div>
+                                            <div className="stat-card">
+                                                <span className="stat-value">{clusterResult.n_noise}</span>
+                                                <span className="stat-label">Noise Points</span>
+                                            </div>
+                                        </div>
 
-                                            return (
-                                                <div key={clusterName} className={`cluster-group ${isExpanded ? 'expanded' : ''}`}>
-                                                    <div
-                                                        className="cluster-header"
-                                                        onClick={() => setExpandedCluster(isExpanded ? null : clusterName)}
-                                                    >
-                                                        <div className="cluster-info">
-                                                            <span className="cluster-name">
-                                                                {clusterName.replace('cluster_', 'Cluster ')}
-                                                            </span>
-                                                            <span className="cluster-count">{stats.count} stars</span>
-                                                        </div>
-                                                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                                    </div>
+                                        {/* Phase 4: Analysis Note (Soft Warning) */}
+                                        {clusterResult.analysis_note && (
+                                            <div className="analysis-note-banner">
+                                                <AlertCircle size={18} />
+                                                <span>{clusterResult.analysis_note}</span>
+                                            </div>
+                                        )}
 
-                                                    {isExpanded && (
-                                                        <div className="cluster-members">
-                                                            {members.slice(0, 50).map((member) => (
-                                                                <div
-                                                                    key={member.id}
-                                                                    className="cluster-member-item"
-                                                                    onClick={() => goToStar(member.id)}
-                                                                >
-                                                                    <Star size={12} className="star-icon" />
-                                                                    <span>{member.source_id}</span>
-                                                                    <span className="coords-hint">
-                                                                        ({member.ra.toFixed(1)}, {member.dec.toFixed(1)})
+                                        <div className="plot-container">
+                                            <Plot
+                                                data={getClusterPlotData()}
+                                                layout={{ ...plotLayout, title: 'Star Clusters (DBSCAN)' }}
+                                                config={{ responsive: true, displayModeBar: false }}
+                                                style={{ width: '100%', height: '400px' }}
+                                                onClick={handlePlotClick}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Cluster List / Explorer */}
+                                    <div className="cluster-explorer">
+                                        <h3>Defined Clusters</h3>
+                                        <div className="cluster-list">
+                                            {Object.keys(clusterResult.clusters)
+                                                .filter(name => name !== 'noise')
+                                                .map(clusterName => {
+                                                    const stats = clusterResult.cluster_stats[clusterName];
+                                                    const isExpanded = expandedCluster === clusterName;
+                                                    const members = clusterResult.clusters[clusterName];
+
+                                                    return (
+                                                        <div key={clusterName} className={`cluster-group ${isExpanded ? 'expanded' : ''}`}>
+                                                            <div
+                                                                className="cluster-header"
+                                                                onClick={() => setExpandedCluster(isExpanded ? null : clusterName)}
+                                                            >
+                                                                <div className="cluster-info">
+                                                                    <span className="cluster-name">
+                                                                        {clusterName.replace('cluster_', 'Cluster ')}
                                                                     </span>
+                                                                    <span className="cluster-count">{stats.count} stars</span>
                                                                 </div>
-                                                            ))}
-                                                            {members.length > 50 && (
-                                                                <div className="more-members">
-                                                                    + {members.length - 50} more...
+                                                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                                            </div>
+
+                                                            {isExpanded && (
+                                                                <div className="cluster-members">
+                                                                    {members.slice(0, 50).map((member) => (
+                                                                        <div
+                                                                            key={member.id}
+                                                                            className="cluster-member-item"
+                                                                            onClick={() => goToStar(member.id)}
+                                                                        >
+                                                                            <Star size={12} className="star-icon" />
+                                                                            <span>{member.source_id}</span>
+                                                                            <span className="coords-hint">
+                                                                                ({member.ra.toFixed(1)}, {member.dec.toFixed(1)})
+                                                                            </span>
+                                                                        </div>
+                                                                    ))}
+                                                                    {members.length > 50 && (
+                                                                        <div className="more-members">
+                                                                            + {members.length - 50} more...
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    {Object.keys(clusterResult.clusters).length === 1 && clusterResult.clusters['noise'] && (
-                                        <div className="no-clusters-msg">Only noise found. Try increasing Epsilon.</div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {!clusterResult && !loading && (
-                        <div className="empty-state">
-                            <Target size={48} />
-                            <h3>No Clusters Yet</h3>
-                            <p>Adjust parameters and click "Run DBSCAN" to find star clusters</p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Anomaly Detection Tab */}
-            {activeTab === 'anomalies' && (
-                <div className="ai-panel">
-                    <div className="controls-row">
-                        <div className="control-group wide">
-                            <label>Contamination (Expected Anomaly %)</label>
-                            <input
-                                type="range"
-                                min="0.01"
-                                max="0.20"
-                                step="0.01"
-                                value={contamination}
-                                onChange={(e) => setContamination(parseFloat(e.target.value))}
-                            />
-                            <span className="value-display">{(contamination * 100).toFixed(0)}%</span>
-                        </div>
-                        <button className="run-btn" onClick={runAnomalyDetection} disabled={loading}>
-                            {loading ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
-                            {loading ? 'Detecting...' : 'Detect Anomalies'}
-                        </button>
-                    </div>
-
-                    {anomalyResult && (
-                        <>
-                            <div className="result-stats">
-                                <div className="stat-card">
-                                    <span className="stat-value">{anomalyResult.total_stars_analyzed}</span>
-                                    <span className="stat-label">Stars Analyzed</span>
-                                </div>
-                                <div className="stat-card highlight">
-                                    <span className="stat-value">{anomalyResult.anomaly_count}</span>
-                                    <span className="stat-label">Anomalies Found</span>
-                                </div>
-                                <div className="stat-card">
-                                    <span className="stat-value">{(anomalyResult.contamination_used * 100).toFixed(1)}%</span>
-                                    <span className="stat-label">Contamination</span>
-                                </div>
-                            </div>
-
-                            {/* Phase 4: Analysis Note (Soft Warning) */}
-                            {anomalyResult.analysis_note && (
-                                <div className="analysis-note-banner">
-                                    <AlertCircle size={18} />
-                                    <span>{anomalyResult.analysis_note}</span>
+                                                    );
+                                                })}
+                                            {Object.keys(clusterResult.clusters).length === 1 && clusterResult.clusters['noise'] && (
+                                                <div className="no-clusters-msg">Only noise found. Try increasing Epsilon.</div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="plot-container">
-                                <Plot
-                                    data={getAnomalyPlotData()}
-                                    layout={{ ...plotLayout, title: 'Anomalous Stars (Isolation Forest)' }}
-                                    config={{ responsive: true, displayModeBar: false }}
-                                    style={{ width: '100%', height: '400px' }}
-                                    onClick={handlePlotClick}
-                                />
-                            </div>
-
-                            {/* Top Anomalies List */}
-                            <div className="anomaly-list">
-                                <h4>Top Anomalies</h4>
-                                <div className="anomaly-items">
-                                    {anomalyResult.anomalies.slice(0, 10).map((a, i) => (
-                                        <div
-                                            key={i}
-                                            className="anomaly-item clickable"
-                                            onClick={() => goToStar(a.id)}
-                                            style={{ cursor: 'pointer' }}
-                                        >
-                                            <div className="anomaly-rank">#{i + 1}</div>
-                                            <div className="anomaly-info">
-                                                <span className="anomaly-id">{a.source_id}</span>
-                                                <span className="anomaly-coords">RA: {a.ra_deg?.toFixed(2)}° | Dec: {a.dec_deg?.toFixed(2)}°</span>
-                                            </div>
-                                            <div className="anomaly-score">
-                                                Score: {Math.abs(a.anomaly_score).toFixed(3)}
-                                                <ChevronRight size={14} style={{ marginLeft: '0.5rem', opacity: 0.5 }} />
-                                            </div>
-                                        </div>
-                                    ))}
+                            {!clusterResult && !loading && (
+                                <div className="empty-state">
+                                    <Target size={48} />
+                                    <h3>No Clusters Yet</h3>
+                                    <p>Adjust parameters and click "Run DBSCAN" to find star clusters</p>
                                 </div>
-                            </div>
-                        </>
+                            )}
+                        </div>
                     )}
 
-                    {!anomalyResult && !loading && (
-                        <div className="empty-state">
-                            <Sparkles size={48} />
-                            <h3>No Anomalies Yet</h3>
-                            <p>Adjust contamination and click "Detect Anomalies" to find unusual stars</p>
+                    {/* Anomaly Detection Tab */}
+                    {activeTab === 'anomalies' && (
+                        <div className="ai-panel">
+                            <div className="controls-row">
+                                <div className="control-group wide">
+                                    <label>Contamination (Expected Anomaly %)</label>
+                                    <input
+                                        type="range"
+                                        min="0.01"
+                                        max="0.20"
+                                        step="0.01"
+                                        value={contamination}
+                                        onChange={(e) => setContamination(parseFloat(e.target.value))}
+                                    />
+                                    <span className="value-display">{(contamination * 100).toFixed(0)}%</span>
+                                </div>
+                                <button className="run-btn" onClick={runAnomalyDetection} disabled={loading}>
+                                    {loading ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
+                                    {loading ? 'Detecting...' : 'Detect Anomalies'}
+                                </button>
+                            </div>
+
+                            {anomalyResult && (
+                                <>
+                                    <div className="result-stats">
+                                        <div className="stat-card">
+                                            <span className="stat-value">{anomalyResult.total_stars_analyzed}</span>
+                                            <span className="stat-label">Stars Analyzed</span>
+                                        </div>
+                                        <div className="stat-card highlight">
+                                            <span className="stat-value">{anomalyResult.anomaly_count}</span>
+                                            <span className="stat-label">Anomalies Found</span>
+                                        </div>
+                                        <div className="stat-card">
+                                            <span className="stat-value">{(anomalyResult.contamination_used * 100).toFixed(1)}%</span>
+                                            <span className="stat-label">Contamination</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Phase 4: Analysis Note (Soft Warning) */}
+                                    {anomalyResult.analysis_note && (
+                                        <div className="analysis-note-banner">
+                                            <AlertCircle size={18} />
+                                            <span>{anomalyResult.analysis_note}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="plot-container">
+                                        <Plot
+                                            data={getAnomalyPlotData()}
+                                            layout={{ ...plotLayout, title: 'Anomalous Stars (Isolation Forest)' }}
+                                            config={{ responsive: true, displayModeBar: false }}
+                                            style={{ width: '100%', height: '400px' }}
+                                            onClick={handlePlotClick}
+                                        />
+                                    </div>
+
+                                    {/* Top Anomalies List */}
+                                    <div className="anomaly-list">
+                                        <h4>Top Anomalies</h4>
+                                        <div className="anomaly-items">
+                                            {anomalyResult.anomalies.slice(0, 10).map((a, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="anomaly-item clickable"
+                                                    onClick={() => goToStar(a.id)}
+                                                    style={{ cursor: 'pointer' }}
+                                                >
+                                                    <div className="anomaly-rank">#{i + 1}</div>
+                                                    <div className="anomaly-info">
+                                                        <span className="anomaly-id">{a.source_id}</span>
+                                                        <span className="anomaly-coords">RA: {a.ra_deg?.toFixed(2)}° | Dec: {a.dec_deg?.toFixed(2)}°</span>
+                                                    </div>
+                                                    <div className="anomaly-score">
+                                                        Score: {Math.abs(a.anomaly_score).toFixed(3)}
+                                                        <ChevronRight size={14} style={{ marginLeft: '0.5rem', opacity: 0.5 }} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {!anomalyResult && !loading && (
+                                <div className="empty-state">
+                                    <Sparkles size={48} />
+                                    <h3>No Anomalies Yet</h3>
+                                    <p>Adjust contamination and click "Detect Anomalies" to find unusual stars</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }

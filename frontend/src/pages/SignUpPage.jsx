@@ -158,11 +158,15 @@ function SignUpForm() {
                 </div>
 
                 <div className="social-login">
-                    <button className="social-button">
+                    <button 
+                        className="social-button"
+                        onClick={() => window.location.href = 'http://localhost:8000/auth/google/login'}
+                        type="button"
+                    >
                         <img src="https://www.google.com/favicon.ico" alt="Google" width="18" height="18" style={{ filter: 'grayscale(100%) brightness(200%)' }} />
                         Google
                     </button>
-                    <button className="social-button">
+                    <button className="social-button" type="button">
                         <img src="https://github.com/favicon.ico" alt="GitHub" width="18" height="18" style={{ filter: 'invert(1)' }} />
                         GitHub
                     </button>

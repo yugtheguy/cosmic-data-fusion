@@ -1,10 +1,20 @@
 /* Query Builder Layout */
+/* Query Builder Layout */
 .query-builder-page {
+    display: flex;
+    min-height: 100vh;
+    background: #0f0f0f;
+    color: #e5e5e5;
+    overflow: hidden;
+}
+
+.query-content-wrapper {
+    flex: 1;
+    margin-left: 280px;
+    /* Sidebar width */
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: #0f0f0f;
-    color: #e5e5e5;
     overflow: hidden;
 }
 

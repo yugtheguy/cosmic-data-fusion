@@ -24,6 +24,38 @@ api.interceptors.request.use(
     }
 );
 
+// Add a response interceptor to handle network errors with retry logic
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const config = error.config;
+
+        // Don't retry if we've already retried or if there's no config
+        if (!config || config._retry) {
+            return Promise.reject(error);
+        }
+
+        // Retry on network errors (ECONNRESET, ECONNREFUSED, timeout)
+        const shouldRetry = 
+            error.code === 'ECONNRESET' ||
+            error.code === 'ECONNREFUSED' ||
+            error.message?.includes('Network Error') ||
+            error.message?.includes('timeout');
+
+        if (shouldRetry) {
+            config._retry = true;
+            
+            // Wait 1 second before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            console.log('Retrying request after connection error...');
+            return api(config);
+        }
+
+        return Promise.reject(error);
+    }
+);
+
 // ============================================
 // Authentication APIs
 // ============================================

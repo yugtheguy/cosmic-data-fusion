@@ -1,3 +1,15 @@
+.coordinate-resolver-page-container {
+    display: flex;
+    min-height: 100vh;
+    background: #0f0f0f;
+}
+
+.coordinate-resolver-content-wrapper {
+    flex: 1;
+    margin-left: 280px;
+    width: 100%;
+}
+
 .coordinate-resolver {
     max-width: 1400px;
     margin: 0 auto;
@@ -149,8 +161,13 @@
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Format Help Panel */
